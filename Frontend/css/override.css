@@ -1,0 +1,146 @@
+/* Box-Sizing (Why Isn't This Default?) */
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+/* Resetting Margins, Padding, Borders, and Outlines */
+* {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    outline: 0;
+
+    font: inherit;
+    color: inherit;
+
+    text-align: inherit;
+    text-decoration: inherit;
+    text-indent: inherit;
+    text-transform: inherit;
+    text-shadow: inherit;
+    text-overflow: inherit;
+}
+
+/* Improving Mobile Text / Font Support */
+* {
+    -webkit-tap-highlight-color: transparent; /* Remove tap highlight on mobile */
+    -webkit-font-smoothing: antialiased; /* Improve text rendering in WebKit */
+    -moz-osx-font-smoothing: grayscale; /* Improve text rendering on macOS */
+    -ms-text-size-adjust: 100%; /* IE 11 */
+    -webkit-text-size-adjust: 100%; /* iOS Safari */
+}
+
+/* Basic Page Setup */
+html, body {
+    height: 100%;
+    width: 100%;
+    line-height: 1;
+    font-size: 100%;
+    font-family: sans-serif;
+    background: transparent;
+    text-rendering: optimizeSpeed;
+}
+
+/* Scroll Behavior */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Override Heading Styles */
+h1, h2, h3, h4, h5, h6 {
+    font-size: inherit;
+    font-weight: inherit;
+}
+
+/* Hide Lists By Default (Easier Navigation Creation) */
+ul, ol {
+    list-style: none;
+}
+
+/* Normalize Tables */
+table {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+/* Normalize Forms */
+button, input, select, textarea {
+    background: transparent;
+    border: none;
+    font: inherit;
+    color: inherit;
+    appearance: none;
+    -webkit-appearance: none; /* Needed for Safari */
+    -moz-appearance: none; /* Older Firefox */
+    -ms-appearance: none; /* Edge Legacy */
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Normalize Links */
+a {
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* Always Cursor On Buttons */
+button, [type="button"], [type="reset"], [type="submit"] {
+    cursor: pointer;
+}
+
+/* Image & Video Responsiveness */
+img, video, iframe, svg, canvas, audio, object, embed {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+
+/* Fixed User Select (Especially for Legacy Browsers) */
+input, textarea {
+    -webkit-user-select: auto;
+    -moz-user-select: auto;
+    -ms-user-select: auto;
+    user-select: auto;
+}
+
+/* Fixed Inheritance (Cross Browser Support) */
+input, textarea, button, select {
+    font: inherit;
+    line-height: inherit;
+    color: inherit;
+}
+
+/* Improve Placeholder Readability */
+::placeholder {
+    color: inherit;
+    opacity: 0.6;
+}
+:-ms-input-placeholder {
+    color: inherit;
+    opacity: 0.6;
+}
+
+/* Top-Based Text & Auto Overflow For Textarea */
+textarea {
+    vertical-align: top;
+    overflow: auto;
+}
+
+/* Override Firefox Placeholder Opacity */
+::-moz-placeholder {
+    opacity: 1;
+}
+
+/* Adds Reduced Motions For Animations */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation: none !important;
+        transition: none !important;
+        scroll-behavior: auto !important;
+    }
+}
