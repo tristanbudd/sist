@@ -14,6 +14,15 @@ const DATA_ROOT = path.join(__dirname, 'data');
 const cors = require('cors');
 app.use(cors());
 
+const rateLimit = require('express-rate-limit');
+
+const dataRequestLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // limit each IP to 100 requests per windowMs for /data file access
+    standardHeaders: true, // Return rate limit info in the RateLimit-* headers
+    legacyHeaders: false,  // Disable the deprecated X-RateLimit-* headers
+});
+
 // Health Check Endpoint
 app.get('/', (req, res) => {
     res.json({ status: 'ok', message: 'Service Operational (SIST - Ship Intelligence & Suspicion Tracker)' });
@@ -25,7 +34,7 @@ app.get('/', (req, res) => {
  */
 app.use('/data', express.static(DATA_ROOT));
 
-app.get('/data/:filename', (req, res) => {
+app.get('/data/:filename', dataRequestLimiter, (req, res) => {
     const unsafeFilename = req.params.filename;
     const filePath = path.resolve(DATA_ROOT, unsafeFilename);
 
