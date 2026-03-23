@@ -1,59 +1,154 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# SIST (Ship Intelligence & Suspicion Tracker)
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+![](https://img.shields.io/github/stars/tristanbudd/sist.svg)
+![](https://img.shields.io/github/watchers/tristanbudd/sist.svg)
+![](https://img.shields.io/github/license/tristanbudd/sist.svg)
 
-## About Laravel
+![](https://img.shields.io/github/issues-raw/tristanbudd/sist.svg)
+![](https://img.shields.io/github/issues-closed-raw/tristanbudd/sist.svg)
+![](https://img.shields.io/github/issues-pr-raw/tristanbudd/sist.svg)
+![](https://img.shields.io/github/issues-pr-closed-raw/tristanbudd/sist.svg)
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+SIST (Ship Intelligence & Suspicion Tracker) - A modern AIS monitoring and analysis platform designed to detect suspicious vessel activity, anomalies, and patterns in maritime data.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+---
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Project Description
 
-## Learning Laravel
+SIST provides a powerful interface for tracking, analysing, and flagging vessel behaviour using AIS (Automatic Identification System) data.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+The platform is built with a Laravel backend and a React + Inertia.js frontend, offering a fast, responsive, and scalable architecture for real-time maritime intelligence.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+It aims to support:
+- Monitoring vessel movement and behaviour.
+- Detecting anomalies and suspicious activity.
+- Visualising maritime data in a clear, actionable way.
+- Providing a foundation for further intelligence tooling.
 
-## Laravel Sponsors
+---
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+## Features
+[TO BE COMPLETED]
 
-### Premium Partners
+---
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+## Preview
+
+[TO BE COMPLETED]
+
+---
+
+## Tech Stack
+
+- **Backend:** Laravel (PHP ≥ 8.3)
+- **Frontend:** React 18 + Inertia.js
+- **Build Tooling:** Vite
+- **Styling:** Tailwind CSS
+- **Linting & Formatting:** ESLint, Prettier, Laravel Pint
+- **Git Hooks:** Husky + lint-staged
+
+---
+
+## Installation & Setup
+
+### 1. Clone the repository
+```bash
+git clone https://github.com/tristanbudd/sist.git
+cd sist
+```
+### 2. Install dependencies
+
+#### PHP dependencies
+```bash
+composer install
+```
+#### Node dependencies (pnpm)
+```bash
+pnpm install
+```
+### 3. Environment setup
+```bash
+cp .env.example .env
+
+Update your .env file:
+
+APP_NAME=SIST
+APP_ENV=local
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=sist
+DB_USERNAME=root
+DB_PASSWORD=
+```
+
+### 4. Generate app key
+```bash
+php artisan key:generate
+```
+### 5. Run migrations
+```bash
+php artisan migrate
+```
+### 6. Start development servers
+
+# Laravel backend
+```bash
+php artisan serve
+```
+
+# Frontend (Vite)
+```bash
+pnpm dev
+```
+---
+
+## Scripts
+```bash
+pnpm dev             # Start Vite dev server
+pnpm build           # Build frontend assets
+
+pnpm lint            # Run ESLint
+pnpm lint:fix        # Fix lint issues
+
+pnpm format          # Format frontend files
+pnpm format:check    # Check formatting
+
+pnpm format:php      # Format PHP (Laravel Pint)
+pnpm format:php:test # Check PHP formatting
+```
+---
+
+## Development Notes
+
+- Uses modern Laravel + Inertia architecture (SPA without full API separation)
+- Frontend is located in resources/js
+- Tailwind CSS is configured via Vite
+- Husky + lint-staged enforce code quality on commits
+
+---
 
 ## Contributing
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Contributions are welcome.
 
-## Code of Conduct
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Ensure linting and formatting pass
+5. Open a pull request
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Please read [CONTRIBUTING.md](https://github.com/tristanbudd/sist/blob/main/CONTRIBUTING.md) for more details.
 
-## Security Vulnerabilities
+---
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Security
+
+If you discover a vulnerability, please open a private issue or follow [SECURITY.md](https://github.com/tristanbudd/sist/blob/main/SECURITY.md).
+
+---
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+[MIT](LICENSE)
