@@ -33,7 +33,7 @@ jobs:
       - name: Run ESLint
         run: pnpm run lint
 
-      - name: Check code formatting
+      - name: Check code formatting (Prettier)
         run: pnpm run format:check
 
       - name: Build Vite/React assets
