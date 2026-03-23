@@ -9,6 +9,7 @@ const path = require('path');
 const app = express();
 const server = http.createServer(app);
 const port = process.env.PORT || 3000;
+const DATA_ROOT = path.join(__dirname, 'data');
 
 const cors = require('cors');
 app.use(cors());
@@ -22,18 +23,29 @@ app.get('/', (req, res) => {
 - Serves static files from the 'data' directory via /data/* (app.use)
 - Handles direct file requests with error logging via /data/:filename (app.get)
  */
-app.use('/data', express.static(path.join(__dirname, 'data')));
+app.use('/data', express.static(DATA_ROOT));
 
 app.get('/data/:filename', (req, res) => {
-    const filePath = path.join(__dirname, 'data', req.params.filename);
+    const unsafeFilename = req.params.filename;
+    const filePath = path.resolve(DATA_ROOT, unsafeFilename);
+
+    // Ensure the resolved path is within the DATA_ROOT directory
+    if (filePath !== DATA_ROOT && !filePath.startsWith(DATA_ROOT + path.sep)) {
+        console.error(`Path traversal attempt blocked | Requested: ${unsafeFilename} | ResolvedPath: ${filePath} | Time: ${new Date().toLocaleString()}`);
+        return res.status(403).json({
+            error: 'Access denied',
+            code: 403,
+            requested: unsafeFilename
+        });
+    }
 
     fs.readFile(filePath, (err, data) => {
         if (err) {
-            console.error(`Error | Requested: ${req.params.filename} | Path: ${filePath} | Message: ${err.message} | Time: ${new Date().toLocaleString()}`);
+            console.error(`Error | Requested: ${unsafeFilename} | Path: ${filePath} | Message: ${err.message} | Time: ${new Date().toLocaleString()}`);
             return res.status(404).json({
                 error: 'File not found',
                 code: 404,
-                requested: req.params.filename,
+                requested: unsafeFilename,
                 resolvedPath: filePath
             });
         }
