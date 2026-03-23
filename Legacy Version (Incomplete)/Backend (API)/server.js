@@ -10,6 +10,7 @@ const app = express();
 const server = http.createServer(app);
 const port = process.env.PORT || 3000;
 const DATA_ROOT = path.join(__dirname, 'data');
+const REAL_DATA_ROOT = fs.realpathSync(DATA_ROOT);
 
 const cors = require('cors');
 app.use(cors());
@@ -36,29 +37,43 @@ app.use('/data', express.static(DATA_ROOT));
 
 app.get('/data/:filename', dataRequestLimiter, (req, res) => {
     const unsafeFilename = req.params.filename;
-    const filePath = path.resolve(DATA_ROOT, unsafeFilename);
+    const candidatePath = path.resolve(DATA_ROOT, unsafeFilename);
 
-    // Ensure the resolved path is within the DATA_ROOT directory
-    if (filePath !== DATA_ROOT && !filePath.startsWith(DATA_ROOT + path.sep)) {
-        console.error(`Path traversal attempt blocked | Requested: ${unsafeFilename} | ResolvedPath: ${filePath} | Time: ${new Date().toLocaleString()}`);
-        return res.status(403).json({
-            error: 'Access denied',
-            code: 403,
-            requested: unsafeFilename
-        });
-    }
-
-    fs.readFile(filePath, (err, data) => {
-        if (err) {
-            console.error(`Error | Requested: ${unsafeFilename} | Path: ${filePath} | Message: ${err.message} | Time: ${new Date().toLocaleString()}`);
+    // Resolve the real path to handle any symbolic links
+    fs.realpath(candidatePath, (realErr, realFilePath) => {
+        if (realErr) {
+            console.error(`Error | Requested: ${unsafeFilename} | Path: ${candidatePath} | Message: ${realErr.message} | Time: ${new Date().toLocaleString()}`);
             return res.status(404).json({
                 error: 'File not found',
                 code: 404,
                 requested: unsafeFilename,
-                resolvedPath: filePath
+                resolvedPath: candidatePath
             });
         }
-        res.type(path.extname(filePath)).send(data);
+
+        // Ensure the resolved real path is within the REAL_DATA_ROOT directory
+        const relative = path.relative(REAL_DATA_ROOT, realFilePath);
+        if (relative.startsWith('..') || path.isAbsolute(relative)) {
+            console.error(`Path traversal attempt blocked | Requested: ${unsafeFilename} | ResolvedPath: ${realFilePath} | Time: ${new Date().toLocaleString()}`);
+            return res.status(403).json({
+                error: 'Access denied',
+                code: 403,
+                requested: unsafeFilename
+            });
+        }
+
+        fs.readFile(realFilePath, (err, data) => {
+            if (err) {
+                console.error(`Error | Requested: ${unsafeFilename} | Path: ${realFilePath} | Message: ${err.message} | Time: ${new Date().toLocaleString()}`);
+                return res.status(404).json({
+                    error: 'File not found',
+                    code: 404,
+                    requested: unsafeFilename,
+                    resolvedPath: realFilePath
+                });
+            }
+            res.type(path.extname(realFilePath)).send(data);
+        });
     });
 });
 
