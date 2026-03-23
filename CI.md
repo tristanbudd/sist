@@ -66,6 +66,19 @@ Continuous Integration runs on every push to `main` and on all pull requests. It
 
 ---
 
+## VS Code Integration & Auto-Formatting
+
+This repository is pre-configured with workspace settings to ensure a seamless developer experience.
+
+When opening this project in VS Code, you will be prompted to install the recommended extensions (ESLint, Prettier, Laravel Pint). Once installed, the workspace `.vscode/settings.json` enforces **Format on Save** and **Auto-Fix on Save** globally:
+
+- **React/JS/CSS:** Handled automatically by Prettier & ESLint.
+- **PHP:** Handled automatically by Laravel Pint.
+
+You should rarely, if ever, have formatting issues block a commit if these extensions are active.
+
+---
+
 ## Available Scripts
 
 ### Frontend (React / Vite)
@@ -81,7 +94,8 @@ pnpm format:check # Check if JS/CSS files are formatted
 
 php artisan serve # Start the PHP development server
 php artisan test # Run backend test suite
-./vendor/bin/pint # Run Laravel Pint to format all PHP files
+pnpm format:php # Format all PHP files using Laravel Pint
+./vendor/bin/pint # Direct access to Laravel Pint binary
 
 ---
 
@@ -115,6 +129,14 @@ When cloning the repository for the first time, run these commands to set up the
 
 If Husky didn't initialize properly upon cloning, manually wire it up:
 pnpm exec husky init
+
+### Husky failing silently (Code 1) on Windows:
+
+If Git Bash crashes instantly when trying to commit, it is likely the Windows CRLF bug.
+
+1. Open `.husky/pre-commit` in VS Code.
+2. Look at the bottom right corner of the window. Change **CRLF** to **LF**.
+3. Save the file and try your commit again.
 
 ### VS Code commit button failing:
 
