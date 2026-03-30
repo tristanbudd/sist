@@ -8,11 +8,12 @@ import tseslint from 'typescript-eslint';
 export default tseslint.config(
     {
         ignores: [
-            'vendor/**',
-            'storage/**',
-            'bootstrap/cache/**',
-            'public/**',
-            'node_modules/**',
+            'vendor/',
+            'storage/',
+            'bootstrap/cache/',
+            'public/',
+            'node_modules/',
+            'dist/',
             '*.config.js',
             '*.config.ts',
         ],
