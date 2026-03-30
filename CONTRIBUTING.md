@@ -1,10 +1,10 @@
-# Contributing to SIST (Ship Information & Surveillance Tracker)
+# Contributing to SIST (Ship Information & Suspicion Tracker)
 
 First off, thanks for taking the time to contribute! Whether you are fixing a bug in the AIS ingestion engine or improving the React map interface, we appreciate the help.
 
 ## Development Environment Setup
 
-SIST is a full-stack application. You will need both PHP 8.2+ and Node.js 20+ installed.
+SIST is a full-stack application. You will need both PHP 8.3+ and Node.js 20+ installed.
 
 1. **Fork and Clone** the repository:
    git clone https://github.com/your-username/SIST.git
@@ -45,6 +45,7 @@ SIST is a full-stack application. You will need both PHP 8.2+ and Node.js 20+ in
 
     # Check Frontend (ESLint & Prettier)
 
+    pnpm typecheck
     pnpm lint
     pnpm format:check
 
@@ -73,7 +74,7 @@ SIST is a full-stack application. You will need both PHP 8.2+ and Node.js 20+ in
 ### Backend (Laravel)
 
 - **Formatting:** Laravel Pint is used for PHP. Run `pnpm format:php` to fix styling automatically.
-- **Type Hinting:** Use PHP 8.2+ type hints for method arguments and return types.
+- **Type Hinting:** Use 3+ type hints for method arguments and return types.
 - **Migrations:** Ensure all database changes have a corresponding migration.
 
 ### Database Precision

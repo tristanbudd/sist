@@ -4,8 +4,9 @@ import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
 import GuestLayout from '@/Layouts/GuestLayout';
 import { Head, useForm } from '@inertiajs/react';
+import { FormEventHandler } from 'react';
 
-export default function ResetPassword({ token, email }) {
+export default function ResetPassword({ token, email }: { token: string; email: string }) {
     const { data, setData, post, processing, errors, reset } = useForm({
         token: token,
         email: email,
@@ -13,7 +14,7 @@ export default function ResetPassword({ token, email }) {
         password_confirmation: '',
     });
 
-    const submit = (e) => {
+    const submit: FormEventHandler = (e) => {
         e.preventDefault();
 
         post(route('password.store'), {
@@ -64,7 +65,6 @@ export default function ResetPassword({ token, email }) {
 
                     <TextInput
                         type="password"
-                        id="password_confirmation"
                         name="password_confirmation"
                         value={data.password_confirmation}
                         className="mt-1 block w-full"
