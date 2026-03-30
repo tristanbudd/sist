@@ -1,77 +1,80 @@
 name: CI
 
 on:
-  pull_request:
-  push:
-    branches: [main]
+    pull_request:
+    push:
+        branches: [main]
 
 permissions:
-  contents: read
+    contents: read
 
 jobs:
-  frontend_lint_and_build:
-    name: Node.js (Frontend)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    frontend_lint_and_build:
+        name: Node.js (Frontend)
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
+            - name: Setup pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  version: 9
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+                  cache: pnpm
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
 
-      - name: Run ESLint
-        run: pnpm run lint
+            - name: Run ESLint
+              run: pnpm run lint
 
-      - name: Check code formatting (Prettier)
-        run: pnpm run format:check
+            - name: Check code formatting (Prettier)
+              run: pnpm run format:check
 
-      - name: Build Vite/React assets
-        run: pnpm run build
+            - name: Run TypeScript Typecheck
+              run: pnpm run typecheck
 
-  backend_test_and_lint:
-    name: PHP (Backend)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+            - name: Build Vite/React assets
+              run: pnpm run build
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.5'
-          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite3, pdo_sqlite, bcmath, intl, gd
-          coverage: none
+    backend_test_and_lint:
+        name: PHP (Backend)
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
 
-      - name: Install Composer Dependencies
-        run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
+            - name: Setup PHP
+              uses: shivammathur/setup-php@v2
+              with:
+                  php-version: '8.3'
+                  extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite3, pdo_sqlite, bcmath, intl, gd
+                  coverage: none
 
-      - name: Prepare Laravel Application
-        run: |
-          cp .env.example .env
-          php artisan key:generate
+            - name: Install Composer Dependencies
+              run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
 
-      - name: Directory Permissions
-        run: chmod -R 777 storage bootstrap/cache
+            - name: Prepare Laravel Application
+              run: |
+                  cp .env.example .env
+                  php artisan key:generate
 
-      - name: Create Database for Tests
-        run: touch database/database.sqlite
+            - name: Directory Permissions
+              run: chmod -R 777 storage bootstrap/cache
 
-      - name: Run Laravel Pint (PHP Linter/Formatter)
-        run: ./vendor/bin/pint --test
+            - name: Create Database for Tests
+              run: touch database/database.sqlite
 
-      - name: Run PHPUnit/Pest Tests
-        env:
-          DB_CONNECTION: sqlite
-          DB_DATABASE: database/database.sqlite
-        run: php artisan test
+            - name: Run Laravel Pint (PHP Linter/Formatter)
+              run: ./vendor/bin/pint --test
+
+            - name: Run PHPUnit/Pest Tests
+              env:
+                  DB_CONNECTION: sqlite
+                  DB_DATABASE: database/database.sqlite
+              run: php artisan test
