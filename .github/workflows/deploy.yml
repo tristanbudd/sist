@@ -22,21 +22,28 @@ jobs:
                   key: ${{ secrets.SSH_PRIVATE_KEY }}
                   script: |
                       cd /var/www/sist
-                      git pull origin main
 
-                      # Install PHP dependencies
+                      # 1. Force Git to match GitHub (Wipes local server changes)
+                      git fetch origin main
+                      git reset --hard origin/main
+
+                      # 2. Ensure pnpm is in the PATH (Standard Ubuntu pnpm path)
+                      export PNPM_HOME="$HOME/.local/share/pnpm"
+                      export PATH="$PNPM_HOME:$PATH"
+
+                      # 3. Install PHP dependencies
                       composer install --no-dev --optimize-autoloader --no-interaction
 
-                      # Install Node dependencies and Build assets
+                      # 4. Install Node dependencies and Build assets
                       pnpm install --frozen-lockfile
                       pnpm run build
 
-                      # Laravel Housekeeping
-                      php artisan migrate --force
-                      php artisan config:cache
-                      php artisan route:cache
-                      php artisan view:cache
+                      # 5. Laravel Housekeeping
+                      php8.3 artisan migrate --force
+                      php8.3 artisan config:cache
+                      php8.3 artisan route:cache
+                      php8.3 artisan view:cache
 
-                      # Ensure permissions remain correct
-                      sudo chgrp -R www-data storage bootstrap/cache
-                      sudo chmod -R ug+rwx storage bootstrap/cache
+                      # 6. Ensure permissions
+                      sudo -n chgrp -R www-data storage bootstrap/cache
+                      sudo -n chmod -R ug+rwx storage bootstrap/cache
