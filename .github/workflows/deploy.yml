@@ -23,20 +23,20 @@ jobs:
                   script: |
                       cd /var/www/sist
 
-                      # 1. Force Git to match GitHub (Wipes local server changes)
+                      # 1. Force Git to match GitHub
                       git fetch origin main
                       git reset --hard origin/main
 
-                      # 2. Ensure pnpm is in the PATH (Standard Ubuntu pnpm path)
-                      export PNPM_HOME="$HOME/.local/share/pnpm"
-                      export PATH="$PNPM_HOME:$PATH"
+                      # 2. Find paths for pnpm and node
+                      export PATH=$PATH:/home/$(whoami)/.local/share/pnpm:/home/$(whoami)/.nvm/versions/node/$(node -v)/bin:/usr/local/bin
 
                       # 3. Install PHP dependencies
                       composer install --no-dev --optimize-autoloader --no-interaction
 
-                      # 4. Install Node dependencies and Build assets
-                      pnpm install --frozen-lockfile
-                      pnpm run build
+                      # 4. Use the absolute pnpm if available, else fallback
+                      PNPM_BIN=$(which pnpm || echo "pnpm")
+                      $PNPM_BIN install --frozen-lockfile
+                      $PNPM_BIN run build
 
                       # 5. Laravel Housekeeping
                       php8.3 artisan migrate --force
@@ -44,6 +44,6 @@ jobs:
                       php8.3 artisan route:cache
                       php8.3 artisan view:cache
 
-                      # 6. Ensure permissions
-                      sudo -n chgrp -R www-data storage bootstrap/cache
-                      sudo -n chmod -R ug+rwx storage bootstrap/cache
+                      # 6. Permissions
+                      sudo -n /usr/bin/chgrp -R www-data storage bootstrap/cache
+                      sudo -n /usr/bin/chmod -R ug+rwx storage bootstrap/cache
