@@ -1,0 +1,39 @@
+name: Deploy to Production
+
+on:
+    push:
+        branches: [main]
+
+jobs:
+    deploy:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Deploy via SSH
+              uses: appleboy/ssh-action@v1.0.3
+              with:
+                  host: ${{ secrets.SERVER_IP }}
+                  username: ${{ secrets.SERVER_USER }}
+                  key: ${{ secrets.SSH_PRIVATE_KEY }}
+                  script: |
+                      cd /var/www/sist
+                      git pull origin main
+
+                      # Install PHP dependencies
+                      composer install --no-dev --optimize-autoloader --no-interaction
+
+                      # Install Node dependencies and Build assets
+                      pnpm install --frozen-lockfile
+                      pnpm run build
+
+                      # Laravel Housekeeping
+                      php artisan migrate --force
+                      php artisan config:cache
+                      php artisan route:cache
+                      php artisan view:cache
+
+                      # Ensure permissions remain correct
+                      sudo chgrp -R www-data storage bootstrap/cache
+                      sudo chmod -R ug+rwx storage bootstrap/cache
