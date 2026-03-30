@@ -3,8 +3,9 @@ import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
 import prettierConfig from 'eslint-config-prettier';
 import globals from 'globals';
+import tseslint from 'typescript-eslint';
 
-export default [
+export default tseslint.config(
     {
         ignores: [
             'vendor/**',
@@ -12,17 +13,19 @@ export default [
             'bootstrap/cache/**',
             'public/**',
             'node_modules/**',
-            '*.config.js'
+            '*.config.js',
+            '*.config.ts',
         ],
     },
-    
+
     js.configs.recommended,
-    
+    ...tseslint.configs.recommended,
+
     react.configs.flat.recommended,
     react.configs.flat['jsx-runtime'],
-    
+
     {
-        files: ['resources/**/*.{js,jsx,ts,tsx}'],
+        files: ['resources/**/*.{ts,tsx}'],
         plugins: {
             'react-hooks': reactHooks,
         },
@@ -37,7 +40,7 @@ export default [
         },
         settings: {
             react: {
-                version: '18.2',
+                version: '19.2',
             },
         },
         rules: {
@@ -45,10 +48,14 @@ export default [
 
             'react/prop-types': 'off',
             'react/no-unescaped-entities': 'off',
-            'no-unused-vars': 'warn',
+
+            'no-unused-vars': 'off',
+            '@typescript-eslint/no-unused-vars': 'warn',
+            '@typescript-eslint/no-explicit-any': 'warn',
+
             'no-console': ['warn', { allow: ['warn', 'error', 'info'] }],
         },
     },
-    
-    prettierConfig,
-];
+
+    prettierConfig
+);

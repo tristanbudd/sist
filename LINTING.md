@@ -6,19 +6,21 @@ Because SIST combines a PHP backend with a React frontend in the same repository
 
 ## Configuration Files
 
-- **.prettierrc** - Prettier configuration for JavaScript, React (JSX), and CSS formatting.
+- **tsconfig.json** - Controls TypeScript compiler rules and strict type-checking for the frontend.
+- **.prettierrc** - Prettier configuration for TypeScript, React (TSX), and CSS formatting.
 - **.prettierignore** - Protects compiled assets and Laravel backend files from Prettier.
-- **eslint.config.js** - Modern ESLint "Flat Config" handling React 18, JSX, and global variables.
+- **eslint.config.js** - Modern ESLint "Flat Config" handling React 19, TS/TSX parsing, and global variables.
 - **pint.json** _(Optional)_ - Laravel Pint configuration (uses Laravel defaults if missing).
 
 ## Available Scripts
 
-### React / Frontend
+### React / Frontend (TypeScript)
 
-- **pnpm lint** - Check for linting errors in resources/js/
-- **pnpm lint:fix** - Fix auto-fixable linting errors
-- **pnpm format** - Format all JS/CSS files with Prettier
-- **pnpm format:check** - Check if JS/CSS files are formatted correctly
+- **pnpm typecheck** - Runs the TypeScript compiler (`tsc --noEmit`) to catch type and interface errors.
+- **pnpm lint** - Check for linting errors in resources/js/ using ESLint.
+- **pnpm lint:fix** - Fix auto-fixable ESLint errors.
+- **pnpm format** - Format all TS/TSX/CSS files with Prettier.
+- **pnpm format:check** - Check if files are formatted correctly (used in CI).
 
 ### Laravel / Backend
 
@@ -30,18 +32,18 @@ Because SIST combines a PHP backend with a React frontend in the same repository
 ### Prettier Settings (Frontend)
 
 - **Semi-colons**: Enabled (true)
-- **Single quotes**: Enabled (true) for JS/JSX
+- **Single quotes**: Enabled (true) for TS/TSX
 - **Print width**: 100 characters (optimal for modern wide screens)
 - **Tab width**: 4 spaces (aligns with standard Laravel formatting)
 - **Trailing commas**: ES5 compatible
 
 ### ESLint Rules (Frontend)
 
-**React/JSX:**
+**React/TSX:**
 
-- Uses the official eslint-plugin-react Flat Config.
+- Uses the official eslint-plugin-react Flat Config alongside TypeScript parsing.
 - **No React import needed**: react/react-in-jsx-scope is disabled for React 17+.
-- **Prop Types**: react/prop-types is disabled (we rely on clear component structures).
+- **Prop Types**: react/prop-types is disabled because we use **TypeScript Interfaces** for strict prop validation.
 - **Apostrophes**: react/no-unescaped-entities is disabled to allow natural text writing.
 
 **Code Quality & Laravel Compatibility:**
@@ -105,6 +107,6 @@ This project uses Husky and lint-staged to guarantee code quality before every c
 
 When building React components for SIST:
 
-- **Routing**: Use the global route('route.name') helper. ESLint is configured to recognize it.
-- **Props**: Data passed from Laravel Controllers arrives as standard React props.
+- **Routing**: Use the global route('route.name') helper. TypeScript is configured to recognize it via Ziggy in `global.d.ts`.
+- **Props**: Data passed from Laravel Controllers arrives as standard React props. Always type these using the PageProps interface defined in resources/js/types/global.d.ts.
 - **No API Calls Needed**: Because we use Inertia.js, you generally do not need axios or fetch to get page data; Laravel injects it directly into your page components.
