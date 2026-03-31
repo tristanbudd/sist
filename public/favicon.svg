@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" width="1000" height="1000"><g clip-path="url(#SvgjsClipPath1135)"><rect width="1000" height="1000" fill="#0a0a0a"></rect><g transform="matrix(0.9765625,0,0,0.9765625,0,0)"><svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" fill="none"><circle cx="512" cy="365" r="128" fill="#FEFEFE"></circle><mask id="mask0_7_4" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="365" width="1024" height="422">
+<rect y="365" width="1024" height="422" fill="#D9D9D9"></rect>
+</mask><g mask="url(#mask0_7_4)">
+<circle cx="512" cy="365" r="256" stroke="white" stroke-width="76"></circle>
+<circle cx="512" cy="365" r="384" stroke="white" stroke-width="76"></circle>
+</g></svg></g></g><defs><clipPath id="SvgjsClipPath1135"><rect width="1000" height="1000" x="0" y="0" rx="350" ry="350"></rect></clipPath></defs></svg>

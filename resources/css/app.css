@@ -1,1 +1,11 @@
 @import 'tailwindcss';
+
+@theme {
+    /* Fonts */
+    --font-sans: 'Geist', sans-serif;
+    --font-mono: 'Geist Mono', monospace;
+
+    /* Base Theme Colors */
+    --color-black: #0a0a0a;
+    --color-foreground: #fefefe;
+}
