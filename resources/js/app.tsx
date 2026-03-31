@@ -2,25 +2,27 @@ import '../css/app.css';
 import './bootstrap';
 
 import { createInertiaApp } from '@inertiajs/react';
-import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createRoot } from 'react-dom/client';
-import { ComponentType } from 'react';
 
-const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+const appName = import.meta.env.VITE_APP_NAME || 'SIST';
+
+const pages = import.meta.glob('./Pages/**/*.tsx', { eager: true });
 
 createInertiaApp({
-    title: (title) => `${title} - ${appName}`,
-    resolve: (name) =>
-        resolvePageComponent(
-            `./Pages/${name}.tsx`,
-            import.meta.glob<ComponentType>('./Pages/**/*.tsx')
-        ),
+    title: (title) => `${appName} | ${title}`,
+
+    resolve: (name) => {
+        const page = pages[`./Pages/${name}.tsx`];
+        if (!page) console.error(`Page Not Found | No page component found for: ${name}`);
+        return page;
+    },
+
     setup({ el, App, props }) {
         const root = createRoot(el);
-
         root.render(<App {...props} />);
     },
+
     progress: {
-        color: '#4B5563',
+        color: '#0a0a0a',
     },
 });
