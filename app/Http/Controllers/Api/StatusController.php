@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 /**
  * @group System Health
@@ -42,11 +42,11 @@ class StatusController extends Controller
     public function index(): JsonResponse
     {
         return response()->json([
-            'status'      => 'online',
-            'service'     => 'SIST | Ship Intelligence & Suspicion Tracker',
-            'version'     => config('app.version', '1.0.0'),
+            'status' => 'online',
+            'service' => 'SIST | Ship Intelligence & Suspicion Tracker',
+            'version' => config('app.version', '1.0.0'),
             'environment' => app()->environment(),
-            'timestamp'   => now()->toIso8601String(),
+            'timestamp' => now()->toIso8601String(),
         ]);
     }
 
@@ -67,7 +67,6 @@ class StatusController extends Controller
      *   },
      *   "timestamp": "2026-01-01T12:00:00+00:00"
      * }
-     *
      * @response 503 scenario="Dependency degraded" {
      *   "status": "degraded",
      *   "checks": {
@@ -94,13 +93,13 @@ class StatusController extends Controller
             $start = hrtime(true);
             DB::select('SELECT 1');
             $checks['database'] = [
-                'status'     => 'ok',
+                'status' => 'ok',
                 'latency_ms' => (int) ((hrtime(true) - $start) / 1_000_000),
             ];
         } catch (\Throwable $e) {
             $healthy = false;
             $checks['database'] = [
-                'status'  => 'error',
+                'status' => 'error',
                 'message' => $e->getMessage(),
             ];
         }
@@ -110,20 +109,20 @@ class StatusController extends Controller
             $start = hrtime(true);
             Cache::set('_healthcheck', true, 5);
             $checks['cache'] = [
-                'status'     => 'ok',
+                'status' => 'ok',
                 'latency_ms' => (int) ((hrtime(true) - $start) / 1_000_000),
             ];
         } catch (\Throwable $e) {
             $healthy = false;
             $checks['cache'] = [
-                'status'  => 'error',
+                'status' => 'error',
                 'message' => $e->getMessage(),
             ];
         }
 
         return response()->json([
-            'status'    => $healthy ? 'healthy' : 'degraded',
-            'checks'    => $checks,
+            'status' => $healthy ? 'healthy' : 'degraded',
+            'checks' => $checks,
             'timestamp' => now()->toIso8601String(),
         ], $healthy ? 200 : 503);
     }
