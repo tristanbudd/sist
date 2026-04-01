@@ -44,6 +44,9 @@ jobs:
                       php artisan route:cache
                       php artisan view:cache
 
-                      # 6. Permissions
+                      # 6. Generate Documentation
+                      php artisan scribe:generate
+
+                      # 7. Permissions
                       sudo -n /usr/bin/chgrp -R www-data storage bootstrap/cache
                       sudo -n /usr/bin/chmod -R ug+rwx storage bootstrap/cache
