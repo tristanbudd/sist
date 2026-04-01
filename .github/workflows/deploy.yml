@@ -39,10 +39,10 @@ jobs:
                       $PNPM_BIN run build
 
                       # 5. Laravel Housekeeping
-                      php8.3 artisan migrate --force
-                      php8.3 artisan config:cache
-                      php8.3 artisan route:cache
-                      php8.3 artisan view:cache
+                      php artisan migrate --force
+                      php artisan config:cache
+                      php artisan route:cache
+                      php artisan view:cache
 
                       # 6. Permissions
                       sudo -n /usr/bin/chgrp -R www-data storage bootstrap/cache
