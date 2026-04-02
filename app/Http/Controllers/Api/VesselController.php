@@ -31,13 +31,30 @@ class VesselController extends Controller
      * @response 200 scenario="Success" {
      * "data": [
      * {
-     * "mmsi": 235000123,
-     * "name": "SIST EXPLORER",
-     * "lat": 50.1234,
-     * "lng": -1.2345,
-     * "speed": 14.5,
-     * "course": 180.2,
-     * "last_seen_at": "2026-04-02T12:00:00+00:00"
+     * "mmsi": 219225000,
+     * "imo": 9326093,
+     * "name": "MAERSK NORFOLK",
+     * "call_sign": "OWDQ2",
+     * "type": 70,
+     * "navigational_status": 0,
+     * "lat": 51.9542,
+     * "lng": 1.2589,
+     * "speed": 18.5,
+     * "course": 210.0,
+     * "heading": 212,
+     * "length": 299,
+     * "width": 40,
+     * "draught": 12.5,
+     * "destination": "FELIXSTOWE",
+     * "eta": "2026-04-03T14:30:00.000000Z",
+     * "last_seen_at": "2026-04-02T14:15:00.000000Z",
+     * "nav_status_text": "Under way using engine",
+     * "vessel_type_text": "Cargo",
+     * "flag_country": "Denmark",
+     * "flag_code": "DK",
+     * "flag_continent": "Europe",
+     * "flag_local_time": "2026-04-02 16:15:00",
+     * "flag_timezone": "Europe/Copenhagen"
      * }
      * ]
      * }
