@@ -2,9 +2,11 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Vessel;
+use App\Models\VesselPosition;
 use Illuminate\Console\Command;
 use WebSocket\Client;
-use App\Models\Vessel;
+use WebSocket\ConnectionException;
 
 class IngestAisData extends Command
 {
@@ -27,22 +29,22 @@ class IngestAisData extends Command
      */
     public function handle()
     {
-        $url = "wss://stream.aisstream.io/v0/stream";
+        $url = 'wss://stream.aisstream.io/v0/stream';
         $apiKey = config('services.aisstream.key');
 
-        $this->info("SIST | Initializing AISStream Connection...");
+        $this->info('SIST | Initializing AISStream Connection...');
 
         try {
             $client = new Client($url, ['timeout' => 60]);
 
             $subscribeMsg = [
-                "APIKey" => $apiKey,
-                "BoundingBoxes" => [[[-90, -180], [90, 180]]],
-                "FilterMessageTypes" => ["PositionReport", "ShipStaticData"]
+                'APIKey' => $apiKey,
+                'BoundingBoxes' => [[[-90, -180], [90, 180]]],
+                'FilterMessageTypes' => ['PositionReport', 'ShipStaticData'],
             ];
 
             $client->send(json_encode($subscribeMsg));
-            $this->info("SIST | Subscription Active. Listening for vessels...");
+            $this->info('SIST | Subscription Active. Listening for vessels...');
 
             while (true) {
                 try {
@@ -52,13 +54,13 @@ class IngestAisData extends Command
                     if (isset($data['MessageType'])) {
                         $this->processMessage($data);
                     }
-                } catch (\WebSocket\ConnectionException $e) {
-                    $this->warn("SIST | Connection lost. Reconnecting...");
-                    break; 
+                } catch (ConnectionException $e) {
+                    $this->warn('SIST | Connection lost. Reconnecting...');
+                    break;
                 }
             }
         } catch (\Exception $e) {
-            $this->error("SIST | Fatal Error: " . $e->getMessage());
+            $this->error('SIST | Fatal Error: '.$e->getMessage());
         }
     }
 
@@ -68,15 +70,26 @@ class IngestAisData extends Command
         $type = $data['MessageType'];
 
         $vessel = Vessel::firstOrNew(['mmsi' => $mmsi]);
+        $needsHistoryUpdate = false;
 
         if ($type === 'PositionReport') {
             $report = $data['Message']['PositionReport'];
+
             $vessel->lat = $report['Latitude'];
             $vessel->lng = $report['Longitude'];
             $vessel->speed = $report['Sog'];
             $vessel->course = $report['Cog'];
-        } 
-        
+
+            if (! $vessel->exists || ! $vessel->last_seen_at) {
+                $needsHistoryUpdate = true;
+            } else {
+                $minutesSinceLastSeen = $vessel->last_seen_at->diffInMinutes(now());
+                if ($minutesSinceLastSeen >= 3) {
+                    $needsHistoryUpdate = true;
+                }
+            }
+        }
+
         if ($type === 'ShipStaticData') {
             $static = $data['Message']['ShipStaticData'];
             $vessel->name = trim($data['MetaData']['ShipName'] ?? $vessel->name);
@@ -84,8 +97,20 @@ class IngestAisData extends Command
         }
 
         $vessel->last_seen_at = now();
+
         $vessel->save();
 
-        $this->line("<info>Updated:</info> [$mmsi] " . ($vessel->name ?? 'Unknown'));
+        if ($needsHistoryUpdate) {
+            VesselPosition::create([
+                'mmsi' => $mmsi,
+                'lat' => $vessel->lat,
+                'lng' => $vessel->lng,
+                'speed' => $vessel->speed,
+                'course' => $vessel->course,
+                'recorded_at' => now(),
+            ]);
+        }
+
+        $this->line("<info>Updated:</info> [$mmsi] ".($vessel->name ?? 'Unknown'));
     }
 }
