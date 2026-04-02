@@ -13,6 +13,7 @@
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^2.10.1",
         "scalar/laravel": "^0.2.1",
+        "textalk/websocket": "^1.5",
         "tightenco/ziggy": "^2.0"
     },
     "require-dev": {
