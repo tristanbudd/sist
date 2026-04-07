@@ -24,5 +24,6 @@ Route::prefix('api')->group(function () {
         Route::get('/', [VesselController::class, 'index'])->name('index');
         Route::get('/{mmsi}', [VesselController::class, 'show'])->name('show');
         Route::get('/{mmsi}/history', [VesselController::class, 'history'])->name('history');
+        Route::get('/{mmsi}/weather', [VesselController::class, 'weather'])->name('weather');
     });
 });

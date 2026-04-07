@@ -3,13 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Vessel;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-
-use App\Models\Vessel;
-
-use Carbon\Carbon;
 
 /**
  * @group System Health
@@ -57,7 +55,7 @@ class StatusController extends Controller
     /**
      * Readiness Check
      *
-     * Checks all critical service dependencies and reports their individual health, 
+     * Checks all critical service dependencies and reports their individual health,
      * including verifying that the background AIS WebSocket ingestion is actively receiving data.
      * Returns 200 when the application is ready, 503 when one or more dependencies are down.
      *
@@ -108,7 +106,7 @@ class StatusController extends Controller
             $httpCode = 503;
             $checks['database'] = [
                 'status' => 'error',
-                'message' => 'Database unreachable: ' . $e->getMessage(),
+                'message' => 'Database unreachable: '.$e->getMessage(),
             ];
         }
 
@@ -124,7 +122,7 @@ class StatusController extends Controller
             $httpCode = 503;
             $checks['cache'] = [
                 'status' => 'error',
-                'message' => 'Cache unreachable: ' . $e->getMessage(),
+                'message' => 'Cache unreachable: '.$e->getMessage(),
             ];
         }
 
@@ -133,9 +131,9 @@ class StatusController extends Controller
                 $start = hrtime(true);
 
                 $latestPing = Vessel::max('last_seen_at');
-                
-                if (!$latestPing) {
-                    throw new \Exception("No vessel data exists in the database.");
+
+                if (! $latestPing) {
+                    throw new \Exception('No vessel data exists in the database.');
                 }
 
                 $latestPingDate = Carbon::parse($latestPing);
@@ -146,18 +144,18 @@ class StatusController extends Controller
                     $checks['ais_stream'] = [
                         'status' => 'ok',
                         'latency_ms' => $latencyMs,
-                        'last_message_age_seconds' => $secondsSinceLastPing
+                        'last_message_age_seconds' => $secondsSinceLastPing,
                     ];
                 } elseif ($secondsSinceLastPing <= 300) {
-                    $healthy = false; 
+                    $healthy = false;
                     $checks['ais_stream'] = [
                         'status' => 'degraded',
                         'latency_ms' => $latencyMs,
                         'last_message_age_seconds' => $secondsSinceLastPing,
-                        'message' => "AIS stream is lagging. Last message was {$secondsSinceLastPing} seconds ago."
+                        'message' => "AIS stream is lagging. Last message was {$secondsSinceLastPing} seconds ago.",
                     ];
                 } else {
-                    throw new \Exception("No AIS data received in the last 15 minutes.");
+                    throw new \Exception('No AIS data received in the last 15 minutes.');
                 }
 
             } catch (\Throwable $e) {
