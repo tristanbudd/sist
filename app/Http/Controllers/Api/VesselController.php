@@ -292,12 +292,12 @@ class VesselController extends Controller
             ], 404);
         }
 
-        // if (! $vessel->last_seen_at || $vessel->last_seen_at->lt(now()->subMinutes(10))) {
-        //     return response()->json([
-        //         'error' => 'No recent vessel position found for this MMSI.',
-        //         'mmsi' => (int) $mmsi,
-        //     ], 404);
-        // }
+        if (! $vessel->last_seen_at || $vessel->last_seen_at->lt(now()->subMinutes(10))) {
+            return response()->json([
+                'error' => 'No recent vessel position found for this MMSI.',
+                'mmsi' => (int) $mmsi,
+            ], 404);
+        }
 
         $position = VesselPosition::where('mmsi', $mmsi)
             ->where('recorded_at', '>=', now()->subMinutes(10))
@@ -346,7 +346,6 @@ class VesselController extends Controller
         }
 
         $payload = $response->json();
-        $timezone = $payload['timezone'] ?? null;
 
         $currentWeather = $payload['current_weather'] ?? null;
         $hourly = $payload['hourly'] ?? [];
