@@ -11,6 +11,8 @@ use WebSocket\ConnectionException;
 
 class IngestAisData extends Command
 {
+    private ?Carbon $nextRetentionRunAt = null;
+
     /**
      * The name and signature of the console command.
      *
@@ -77,6 +79,8 @@ class IngestAisData extends Command
 
     private function processMessage(array $data)
     {
+        $this->pruneVesselPositionHistory();
+
         $mmsi = $data['MetaData']['MMSI'];
         $type = $data['MessageType'];
 
@@ -202,5 +206,25 @@ class IngestAisData extends Command
         $normalized = trim((string) $value);
 
         return $normalized === '' ? null : $normalized;
+    }
+
+    private function pruneVesselPositionHistory(): void
+    {
+        $now = now();
+
+        if ($this->nextRetentionRunAt !== null && $now->lt($this->nextRetentionRunAt)) {
+            return;
+        }
+
+        $deleted = VesselPosition::query()
+            ->where('recorded_at', '<', $now->copy()->subDays(30))
+            ->delete();
+
+        if ($deleted > 0) {
+            $this->line("<comment>Retention:</comment> removed {$deleted} vessel position records older than 30 days.");
+        }
+
+        // Run cleanup periodically to keep overhead low in the streaming loop.
+        $this->nextRetentionRunAt = $now->copy()->addMinutes(15);
     }
 }
