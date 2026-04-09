@@ -83,6 +83,19 @@ class IngestAisData extends Command
         $vessel = Vessel::firstOrNew(['mmsi' => $mmsi]);
         $needsHistoryUpdate = false;
 
+        $vessel->flag = $this->cleanNullableString(
+            data_get($data, 'MetaData.Flag')
+                ?? data_get($data, 'MetaData.FlagCode')
+                ?? data_get($data, 'Message.ShipStaticData.Flag')
+                ?? data_get($data, 'Message.ShipStaticData.FlagCode')
+                ?? $vessel->flag
+        );
+
+        $vessel->ais_message_id = data_get($data, 'Message.MessageID', $vessel->ais_message_id);
+        $vessel->repeat_indicator = data_get($data, 'Message.RepeatIndicator', $vessel->repeat_indicator);
+        $vessel->user_id = data_get($data, 'Message.UserID', $vessel->user_id);
+        $vessel->valid = data_get($data, 'Message.Valid', $vessel->valid);
+
         if ($type === 'PositionReport') {
             $report = $data['Message']['PositionReport'];
 
@@ -93,6 +106,15 @@ class IngestAisData extends Command
 
             $vessel->heading = $report['TrueHeading'] === 511 ? null : $report['TrueHeading'];
             $vessel->navigational_status = $report['NavigationalStatus'] ?? null;
+            $vessel->rate_of_turn = $report['RateOfTurn'] ?? null;
+            $vessel->position_accuracy = $report['PositionAccuracy'] ?? null;
+            $vessel->position_timestamp = isset($report['Timestamp']) && $report['Timestamp'] <= 59
+                ? $report['Timestamp']
+                : null;
+            $vessel->special_manoeuvre_indicator = $report['SpecialManoeuvreIndicator'] ?? null;
+            $vessel->position_spare = $report['Spare'] ?? null;
+            $vessel->raim = $report['Raim'] ?? null;
+            $vessel->communication_state = $report['CommunicationState'] ?? null;
 
             if (! $vessel->exists || ! $vessel->last_seen_at || $vessel->last_seen_at->diffInMinutes(now()) >= 3) {
                 $needsHistoryUpdate = true;
@@ -102,16 +124,25 @@ class IngestAisData extends Command
         if ($type === 'ShipStaticData') {
             $static = $data['Message']['ShipStaticData'];
 
-            $vessel->name = trim($data['MetaData']['ShipName'] ?? $vessel->name);
+            $vessel->name = $this->cleanNullableString($static['Name'] ?? $data['MetaData']['ShipName'] ?? $vessel->name);
             $vessel->type = $static['Type'] ?? $vessel->type;
             $vessel->imo = $static['ImoNumber'] ?? $vessel->imo;
-            $vessel->call_sign = trim($static['CallSign'] ?? $vessel->call_sign);
-            $vessel->destination = trim($static['Destination'] ?? $vessel->destination);
+            $vessel->call_sign = $this->cleanNullableString($static['CallSign'] ?? $vessel->call_sign);
+            $vessel->destination = $this->cleanNullableString($static['Destination'] ?? $vessel->destination);
+
+            $vessel->ais_version = $static['AisVersion'] ?? $vessel->ais_version;
+            $vessel->fix_type = $static['FixType'] ?? $vessel->fix_type;
+            $vessel->dte = $static['Dte'] ?? $vessel->dte;
+            $vessel->static_spare = $static['Spare'] ?? $vessel->static_spare;
 
             $vessel->draught = isset($static['MaximumStaticDraught']) ? ($static['MaximumStaticDraught'] / 10) : $vessel->draught;
 
             if (isset($static['Dimension'])) {
                 $dim = $static['Dimension'];
+                $vessel->dimension_a = $dim['A'] ?? $vessel->dimension_a;
+                $vessel->dimension_b = $dim['B'] ?? $vessel->dimension_b;
+                $vessel->dimension_c = $dim['C'] ?? $vessel->dimension_c;
+                $vessel->dimension_d = $dim['D'] ?? $vessel->dimension_d;
                 $vessel->length = ($dim['A'] ?? 0) + ($dim['B'] ?? 0);
                 $vessel->width = ($dim['C'] ?? 0) + ($dim['D'] ?? 0);
             }
@@ -134,16 +165,42 @@ class IngestAisData extends Command
         $vessel->save();
 
         if ($needsHistoryUpdate) {
+            $report = $data['Message']['PositionReport'] ?? [];
+
             VesselPosition::create([
                 'mmsi' => $mmsi,
+                'ais_message_id' => data_get($data, 'Message.MessageID'),
+                'repeat_indicator' => data_get($data, 'Message.RepeatIndicator'),
+                'user_id' => data_get($data, 'Message.UserID'),
+                'valid' => data_get($data, 'Message.Valid'),
                 'lat' => $vessel->lat,
                 'lng' => $vessel->lng,
                 'speed' => $vessel->speed,
                 'course' => $vessel->course,
+                'heading' => $vessel->heading,
+                'navigational_status' => data_get($report, 'NavigationalStatus'),
+                'rate_of_turn' => data_get($report, 'RateOfTurn'),
+                'position_accuracy' => data_get($report, 'PositionAccuracy'),
+                'position_timestamp' => data_get($report, 'Timestamp'),
+                'special_manoeuvre_indicator' => data_get($report, 'SpecialManoeuvreIndicator'),
+                'position_spare' => data_get($report, 'Spare'),
+                'raim' => data_get($report, 'Raim'),
+                'communication_state' => data_get($report, 'CommunicationState'),
                 'recorded_at' => now(),
             ]);
         }
 
         $this->line("<info>Updated:</info> [$mmsi] ".($vessel->name ?? 'Unknown'));
+    }
+
+    private function cleanNullableString(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $normalized = trim((string) $value);
+
+        return $normalized === '' ? null : $normalized;
     }
 }

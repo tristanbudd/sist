@@ -50,11 +50,16 @@ class VesselController extends Controller
      * "last_seen_at": "2026-04-02T14:15:00.000000Z",
      * "nav_status_text": "Under way using engine",
      * "vessel_type_text": "Cargo",
-     * "flag_country": "Denmark",
-     * "flag_code": "DK",
-     * "flag_continent": "Europe",
-     * "flag_local_time": "2026-04-02 16:15:00",
-     * "flag_timezone": "Europe/Copenhagen"
+     * "flying_flag": "DK",
+     * "flying_flag_country": "Denmark",
+     * "flying_flag_continent": "Europe",
+     * "flying_flag_local_time": "2026-04-02 16:15:00",
+     * "flying_flag_timezone": "Europe/Copenhagen",
+     * "registry_country": "Denmark",
+     * "registry_country_code": "DK",
+     * "registry_continent": "Europe",
+     * "registry_local_time": "2026-04-02 16:15:00",
+     * "registry_timezone": "Europe/Copenhagen"
      * }
      * ]
      * }
@@ -114,11 +119,16 @@ class VesselController extends Controller
      * "last_seen_at": "2026-04-02T14:15:00.000000Z",
      * "nav_status_text": "Under way using engine",
      * "vessel_type_text": "Cargo",
-     * "flag_country": "Denmark",
-     * "flag_code": "DK",
-     * "flag_continent": "Europe",
-     * "flag_local_time": "2026-04-02 16:15:00",
-     * "flag_timezone": "Europe/Copenhagen"
+     * "flying_flag": "DK",
+     * "flying_flag_country": "Denmark",
+     * "flying_flag_continent": "Europe",
+     * "flying_flag_local_time": "2026-04-02 16:15:00",
+     * "flying_flag_timezone": "Europe/Copenhagen",
+     * "registry_country": "Denmark",
+     * "registry_country_code": "DK",
+     * "registry_continent": "Europe",
+     * "registry_local_time": "2026-04-02 16:15:00",
+     * "registry_timezone": "Europe/Copenhagen"
      * }
      * @response 404 scenario="Vessel not found" {
      * "error": "Vessel not found in SIST records",
@@ -144,11 +154,16 @@ class VesselController extends Controller
      * @responseField last_seen_at string ISO 8601 timestamp of the last received AIS report.
      * @responseField nav_status_text string Human-readable translation of the navigational status.
      * @responseField vessel_type_text string Human-readable translation of the vessel's classification.
-     * @responseField flag_country string The country of registry extracted from the MMSI's MID.
-     * @responseField flag_code string The ISO 3166-1 alpha-2 country code of the registry.
-     * @responseField flag_continent string The continent of the vessel's registry.
-     * @responseField flag_local_time string The calculated current local time in the vessel's registry.
-     * @responseField flag_timezone string The IANA timezone string for the vessel's registry.
+     * @responseField flying_flag string The 2-letter flag code from the vessel's current AIS transmission.
+     * @responseField flying_flag_country string The country corresponding to the current flying flag.
+     * @responseField flying_flag_continent string The continent of the current flying flag.
+     * @responseField flying_flag_local_time string The calculated current local time based on the flying flag's timezone.
+     * @responseField flying_flag_timezone string The IANA timezone string for the current flying flag.
+     * @responseField registry_country string The country of registry extracted from the MMSI's MID (home port).
+     * @responseField registry_country_code string The ISO 3166-1 alpha-2 country code of the registry.
+     * @responseField registry_continent string The continent of the vessel's registry (home port).
+     * @responseField registry_local_time string The calculated current local time in the vessel's registry.
+     * @responseField registry_timezone string The IANA timezone string for the vessel's registry.
      *
      * @param  int  $mmsi
      */
@@ -206,7 +221,36 @@ class VesselController extends Controller
         $positions = VesselPosition::where('mmsi', $mmsi)
             ->where('recorded_at', '>=', now()->subHours($hours))
             ->orderBy('recorded_at', 'desc')
-            ->get(['lat', 'lng', 'speed', 'course', 'recorded_at']);
+            ->get([
+                'mmsi',
+                'lat',
+                'lng',
+                'speed',
+                'course',
+                'heading',
+                'navigational_status',
+                'rate_of_turn',
+                'position_accuracy',
+                'raim',
+                'recorded_at',
+            ]);
+
+        // Transform to pair numeric values with their text equivalents
+        $history = $positions->map(function ($position) {
+            return [
+                'lat' => $position->lat,
+                'lng' => $position->lng,
+                'speed' => $position->speed,
+                'course' => $position->course,
+                'heading' => $position->heading,
+                'nav_status' => $position->navigational_status,
+                'nav_status_text' => $position->nav_status_text,
+                'rate_of_turn' => $position->rate_of_turn,
+                'position_accuracy' => $position->position_accuracy,
+                'raim' => $position->raim,
+                'recorded_at' => $position->recorded_at,
+            ];
+        });
 
         if ($positions->isEmpty()) {
             return response()->json(['error' => 'No history found for this time period'], 404);
@@ -214,7 +258,7 @@ class VesselController extends Controller
 
         return response()->json([
             'mmsi' => (int) $mmsi,
-            'history' => $positions,
+            'history' => $history,
         ]);
     }
 }
