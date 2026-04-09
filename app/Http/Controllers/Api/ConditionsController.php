@@ -25,6 +25,54 @@ class ConditionsController extends Controller
      * Uses Open-Meteo.
      *
      * @urlParam mmsi integer required The Maritime Mobile Service Identity (MMSI) number. Example: 219225000
+    * @response 404 scenario="Vessel not found" {
+    *   "error": "Vessel not found in SIST records",
+    *   "mmsi": 219225000
+    * }
+    * @response 200 scenario="Weather snapshot found" {
+    *   "mmsi": 219225000,
+    *   "vessel": {
+    *     "name": "M/V Nordic Trader",
+    *     "last_seen_at": "2026-04-09T14:42:12+00:00",
+    *     "position_age_seconds": 95
+    *   },
+    *   "position": {
+    *     "lat": 56.152,
+    *     "lng": 10.214
+    *   },
+    *   "current": {
+    *     "time": "2026-04-09T14:00",
+    *     "temperature_c": 8.7,
+    *     "apparent_temperature_c": 6.9,
+    *     "wind_speed_kph": 19.4,
+    *     "wind_direction_degrees": 241,
+    *     "wind_gusts_kph": 33.1,
+    *     "weather_code": 3,
+    *     "is_day": 1
+    *   },
+    *   "hourly": [
+    *     {
+    *       "time": "2026-04-09T15:00",
+    *       "temperature_c": 8.9,
+    *       "apparent_temperature_c": 7.1,
+    *       "precipitation_mm": 0,
+    *       "cloud_cover_percent": 66,
+    *       "wind_speed_kph": 20.1,
+    *       "wind_direction_degrees": 245
+    *     }
+    *   ],
+    *   "daily": [
+    *     {
+    *       "date": "2026-04-09",
+    *       "temperature_max_c": 10.1,
+    *       "temperature_min_c": 5.2,
+    *       "precipitation_sum_mm": 0.3,
+    *       "wind_speed_max_kph": 28.4,
+    *       "weather_code": 3
+    *     }
+    *   ],
+    *   "source": "open-meteo.com"
+    * }
      */
     public function weather($mmsi): JsonResponse
     {
@@ -166,6 +214,46 @@ class ConditionsController extends Controller
      * Uses Open-Meteo Marine.
      *
      * @urlParam mmsi integer required The Maritime Mobile Service Identity (MMSI) number. Example: 219225000
+    * @response 404 scenario="Vessel not found" {
+    *   "error": "Vessel not found in SIST records",
+    *   "mmsi": 219225000
+    * }
+    * @response 200 scenario="Tide snapshot found" {
+    *   "mmsi": 219225000,
+    *   "vessel": {
+    *     "name": "M/V Nordic Trader",
+    *     "last_seen_at": "2026-04-09T14:42:12+00:00",
+    *     "position_age_seconds": 95
+    *   },
+    *   "position": {
+    *     "lat": 56.152,
+    *     "lng": 10.214
+    *   },
+    *   "current": {
+    *     "time": "2026-04-09T14:00",
+    *     "sea_level_height_msl": 0.54,
+    *     "ocean_current_velocity": 0.12,
+    *     "ocean_current_direction": 208,
+    *     "wave_height": 1.4,
+    *     "wave_direction": 232,
+    *     "wave_period": 5.6
+    *   },
+    *   "predictions": [
+    *     {
+    *       "time": "2026-04-09T15:00",
+    *       "sea_level_height_msl": 0.58,
+    *       "ocean_current_velocity": 0.14,
+    *       "ocean_current_direction": 214,
+    *       "wave_height": 1.5,
+    *       "wave_direction": 236,
+    *       "wave_period": 5.9
+    *     }
+    *   ],
+    *   "metadata": {
+    *     "timezone": "Europe/Copenhagen"
+    *   },
+    *   "source": "open-meteo.com"
+    * }
      */
     public function tides($mmsi): JsonResponse
     {
