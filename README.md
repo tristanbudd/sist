@@ -31,6 +31,14 @@ It aims to support:
 
 ---
 
+## Documentation
+
+Hosted docs: [https://sist.tristanbudd.com/docs](https://sist.tristanbudd.com/docs)
+
+Local docs: Available under `localhost:3000/docs` or `localhost:3000/documentation`
+
+---
+
 ## Features
 [TO BE COMPLETED]
 
