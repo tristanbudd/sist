@@ -24,6 +24,7 @@ SIST provides a powerful interface for tracking, analysing, and flagging vessel 
 The platform is built with a Laravel backend and a React + Inertia.js frontend, offering a fast, responsive, and scalable architecture for real-time maritime intelligence.
 
 It aims to support:
+
 - Monitoring vessel movement and behaviour.
 - Detecting anomalies and suspicious activity.
 - Visualising maritime data in a clear, actionable way.
@@ -35,11 +36,12 @@ It aims to support:
 
 Hosted docs: [https://sist.tristanbudd.com/docs](https://sist.tristanbudd.com/docs)
 
-Local docs: Available under `localhost:3000/docs` or `localhost:3000/documentation`
+Local docs: Available under `http://127.0.0.1:8000/docs` or `http://127.0.0.1:8000/documentation` after running the development server.
 
 ---
 
 ## Features
+
 [TO BE COMPLETED]
 
 ---
@@ -64,21 +66,28 @@ Local docs: Available under `localhost:3000/docs` or `localhost:3000/documentati
 ## Installation & Setup
 
 ### 1. Clone the repository
+
 ```bash
 git clone https://github.com/tristanbudd/sist.git
 cd sist
 ```
+
 ### 2. Install dependencies
 
 #### PHP dependencies
+
 ```bash
 composer install
 ```
+
 #### Node dependencies (pnpm)
+
 ```bash
 pnpm install
 ```
+
 ### 3. Environment setup
+
 ```bash
 cp .env.example .env
 
@@ -96,27 +105,35 @@ DB_PASSWORD=
 ```
 
 ### 4. Generate app key
+
 ```bash
 php artisan key:generate
 ```
+
 ### 5. Run migrations
+
 ```bash
 php artisan migrate
 ```
+
 ### 6. Start development servers
 
 # Laravel backend
+
 ```bash
 php artisan serve
 ```
 
 # Frontend (Vite)
+
 ```bash
 pnpm dev
 ```
+
 ---
 
 ## Scripts
+
 ```bash
 pnpm dev             # Start Vite dev server
 pnpm build           # Build frontend assets
@@ -130,6 +147,7 @@ pnpm format:check    # Check formatting
 pnpm format:php      # Format PHP (Laravel Pint)
 pnpm format:php:test # Check PHP formatting
 ```
+
 ---
 
 ## Development Notes

@@ -14,7 +14,18 @@ return [
     'title' => 'SIST | API Documentation',
 
     // A short description of your API. Will be included in the docs webpage, Postman collection and OpenAPI spec.
-    'description' => '',
+    'description' => <<<'TEXT'
+SIST (Ship Intelligence & Suspicion Tracker) provides maritime situational awareness APIs built on AIS vessel data.
+
+Use these endpoints to:
+- Check platform health and API status
+- Retrieve live and historical vessel intelligence
+- Enrich vessel context with weather and marine condition snapshots
+
+(TO BE EXPANDED)
+
+All responses are JSON and designed for dashboard, alerting, and analytics workflows.
+TEXT,
 
     // Text to place in the "Introduction" section, right after the `description`. Markdown and HTML are supported.
     'intro_text' => <<<'INTRO'
