@@ -28,6 +28,9 @@ return new class extends Migration
             $table->timestamp('eta')->nullable();
             $table->timestamp('last_seen_at')->nullable();
             $table->timestamps();
+
+            $table->index('last_seen_at');
+            $table->index(['lat', 'lng']);
         });
     }
 

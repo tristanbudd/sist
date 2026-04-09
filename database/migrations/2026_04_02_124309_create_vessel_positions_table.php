@@ -21,6 +21,7 @@ return new class extends Migration
             $table->foreign('mmsi')->references('mmsi')->on('vessels')->onDelete('cascade');
 
             $table->index(['mmsi', 'recorded_at']);
+            $table->index('recorded_at');
         });
     }
 
