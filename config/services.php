@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'aisstream' => [
+        'key' => env('AISSTREAM_API_KEY'),
+    ],
+
 ];

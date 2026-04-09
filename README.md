@@ -1,3 +1,7 @@
+<div align="center">
+    <img width="820" height="312" alt="SIST (Ship Intelligence & Suspicion Tracker) Banner" src="https://github.com/user-attachments/assets/d48bd8c6-626b-4203-b7c8-bef979ee805d" />
+</div>
+
 # SIST (Ship Intelligence & Suspicion Tracker)
 
 ![](https://img.shields.io/github/stars/tristanbudd/sist.svg)

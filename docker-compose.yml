@@ -12,6 +12,7 @@ services:
             APP_DEBUG: 'false'
             APP_URL: ${APP_URL}
             APP_KEY: ${APP_KEY}
+            RUN_DEPLOY_TASKS_ON_STARTUP: 'true'
             LOG_CHANNEL: stack
             LOG_LEVEL: info
             DB_CONNECTION: mysql
@@ -42,11 +43,15 @@ services:
         depends_on:
             db:
                 condition: service_healthy
+            app:
+                condition: service_healthy
         environment:
             APP_ENV: production
             APP_DEBUG: 'false'
             APP_URL: ${APP_URL}
             APP_KEY: ${APP_KEY}
+            RUN_DEPLOY_TASKS_ON_STARTUP: 'false'
+            RUN_MIGRATIONS_ON_STARTUP: 'true'
             LOG_CHANNEL: stack
             LOG_LEVEL: info
             DB_CONNECTION: mysql
