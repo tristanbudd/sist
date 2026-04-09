@@ -16,6 +16,11 @@ chown -R www-data:www-data storage bootstrap/cache
 find storage bootstrap/cache -type d -exec chmod 775 {} \;
 find storage bootstrap/cache -type f -exec chmod 664 {} \;
 
+if [ "${RUN_MIGRATIONS_ON_STARTUP:-false}" = "true" ]; then
+	echo "Running startup migration check..."
+	php artisan migrate --force
+fi
+
 if [ "${RUN_DEPLOY_TASKS_ON_STARTUP:-true}" = "true" ]; then
 	echo "Running deploy tasks (migrate/cache/docs)..."
 	php artisan migrate --force
