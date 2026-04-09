@@ -23,6 +23,16 @@ services:
             AISSTREAM_API_KEY: ${AISSTREAM_API_KEY}
         ports:
             - '${APP_BIND_PORT:-18080}:8080'
+        healthcheck:
+            test:
+                [
+                    'CMD-SHELL',
+                    'php -r "exit((int)(@file_get_contents(\"http://127.0.0.1:8080/up\")===false));"',
+                ]
+            interval: 30s
+            timeout: 5s
+            retries: 3
+            start_period: 30s
 
     ais-worker:
         build:
@@ -60,7 +70,7 @@ services:
             - sist_mysql_data:/var/lib/mysql
         healthcheck:
             test:
-                ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-uroot', '-p${DB_ROOT_PASSWORD}']
+                ['CMD-SHELL', 'mysqladmin ping -h localhost -uroot -p"$$DB_ROOT_PASSWORD" --silent']
             interval: 10s
             timeout: 5s
             retries: 12
