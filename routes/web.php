@@ -12,8 +12,8 @@ Route::get('/', function () {
 Route::redirect('/documentation', '/docs');
 
 /* API Routes */
-use App\Http\Controllers\Api\StatusController;
 use App\Http\Controllers\Api\ConditionsController;
+use App\Http\Controllers\Api\StatusController;
 use App\Http\Controllers\Api\VesselController;
 
 Route::prefix('api')->group(function () {

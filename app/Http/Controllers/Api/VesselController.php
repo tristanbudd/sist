@@ -217,5 +217,4 @@ class VesselController extends Controller
             'history' => $positions,
         ]);
     }
-
 }

@@ -1,0 +1,79 @@
+services:
+    app:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        restart: unless-stopped
+        depends_on:
+            db:
+                condition: service_healthy
+        environment:
+            APP_ENV: production
+            APP_DEBUG: 'false'
+            APP_URL: ${APP_URL}
+            APP_KEY: ${APP_KEY}
+            LOG_CHANNEL: stack
+            LOG_LEVEL: info
+            DB_CONNECTION: mysql
+            DB_HOST: db
+            DB_PORT: 3306
+            DB_DATABASE: ${DB_DATABASE}
+            DB_USERNAME: ${DB_USERNAME}
+            DB_PASSWORD: ${DB_PASSWORD}
+            AISSTREAM_API_KEY: ${AISSTREAM_API_KEY}
+        ports:
+            - '${APP_BIND_PORT:-18080}:8080'
+        healthcheck:
+            test:
+                [
+                    'CMD-SHELL',
+                    'php -r "exit((int)(@file_get_contents(\"http://127.0.0.1:8080/up\")===false));"',
+                ]
+            interval: 30s
+            timeout: 5s
+            retries: 3
+            start_period: 30s
+
+    ais-worker:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        restart: unless-stopped
+        depends_on:
+            db:
+                condition: service_healthy
+        environment:
+            APP_ENV: production
+            APP_DEBUG: 'false'
+            APP_URL: ${APP_URL}
+            APP_KEY: ${APP_KEY}
+            LOG_CHANNEL: stack
+            LOG_LEVEL: info
+            DB_CONNECTION: mysql
+            DB_HOST: db
+            DB_PORT: 3306
+            DB_DATABASE: ${DB_DATABASE}
+            DB_USERNAME: ${DB_USERNAME}
+            DB_PASSWORD: ${DB_PASSWORD}
+            AISSTREAM_API_KEY: ${AISSTREAM_API_KEY}
+        command: ['php', 'artisan', 'sist:ingest-ais']
+
+    db:
+        image: mysql:8.4
+        restart: unless-stopped
+        environment:
+            MYSQL_DATABASE: ${DB_DATABASE}
+            MYSQL_USER: ${DB_USERNAME}
+            MYSQL_PASSWORD: ${DB_PASSWORD}
+            MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+        volumes:
+            - sist_mysql_data:/var/lib/mysql
+        healthcheck:
+            test:
+                ['CMD-SHELL', 'mysqladmin ping -h localhost -uroot -p"$$DB_ROOT_PASSWORD" --silent']
+            interval: 10s
+            timeout: 5s
+            retries: 12
+
+volumes:
+    sist_mysql_data:
