@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Vessel;
 use App\Models\VesselPosition;
+use App\Services\SanctionsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -259,6 +260,106 @@ class VesselController extends Controller
         return response()->json([
             'mmsi' => (int) $mmsi,
             'history' => $history,
+        ]);
+    }
+
+    /**
+     * Check Sanctions Status
+     *
+     * Check if a vessel is listed on international sanctions lists using multiple sources:
+     * - sanctions.network (OFAC SDN, UN, EU sanctions lists)
+     * - FleetLeaks (sanctioned vessel map data)
+     *
+     * @urlParam mmsi integer required The MMSI of the vessel. Example: 219225000
+     *
+     * @queryParam force_refresh boolean Force refresh cached data (default: false). Example: false
+     *
+     * @response 200 scenario="Vessel checked - Sanctioned" {
+     * "vessel_name": "EXAMPLE SANCTIONED SHIP",
+     * "imo": 1234567,
+     * "mmsi": 123456789,
+     * "call_sign": "EXCS",
+     * "is_sanctioned": true,
+     * "risk_level": "high",
+     * "sanctions_count": 2,
+     * "sources_confirming": ["sanctions_network", "fleetleaks"],
+     * "checked_at": "2026-04-02T14:15:00+00:00",
+     * "sources": {
+     * "sanctions_network": {
+     * "status": "ok",
+     * "found": true,
+     * "count": 1,
+     * "results": [
+     * {
+     * "name": "EXAMPLE SANCTIONED SHIP",
+     * "source": "unsc"
+     * }
+     * ]
+     * },
+     * "fleetleaks": {
+     * "status": "ok",
+     * "found": true,
+     * "count": 1,
+     * "results": [
+     * {
+     * "name": "EXAMPLE SANCTIONED SHIP",
+     * "imo": 1234567,
+     * "sanctioned_by": ["UN", "EU"],
+     * "ais_status": "active"
+     * }
+     * ]
+     * }
+     * }
+     * }
+     * @response 404 scenario="Vessel not found in SIST records" {
+     * "error": "Vessel not found in SIST records",
+     * "mmsi": 999999999
+     * }
+     *
+     * @param  int  $mmsi
+     */
+    public function checkSanctions(Request $request, $mmsi, SanctionsService $sanctionsService): JsonResponse
+    {
+        $vessel = Vessel::where('mmsi', $mmsi)->first();
+
+        if (! $vessel) {
+            return response()->json([
+                'error' => 'Vessel not found in SIST records',
+                'mmsi' => (int) $mmsi,
+            ], 404);
+        }
+
+        // Validate vessel has identifying information
+        if (! $vessel->name && ! $vessel->imo && ! $vessel->mmsi && ! $vessel->call_sign) {
+            return response()->json([
+                'error' => 'Insufficient vessel data for sanctions check',
+                'mmsi' => (int) $mmsi,
+            ], 422);
+        }
+
+        $forceRefresh = $request->boolean('force_refresh');
+
+        $result = $sanctionsService->checkVessel(
+            $vessel->name ?? "MMSI-{$vessel->mmsi}",
+            $vessel->imo ? (string) $vessel->imo : null,
+            $vessel->mmsi ? (string) $vessel->mmsi : null,
+            $vessel->call_sign,
+            $forceRefresh
+        );
+
+        // Build clean response matching API style
+        return response()->json([
+            'mmsi' => (int) $mmsi,
+            'imo' => $vessel->imo,
+            'name' => $result['vessel_name'],
+            'call_sign' => $vessel->call_sign,
+            'is_sanctioned' => $result['is_sanctioned'],
+            'sanctions_count' => $result['sanctions_count'],
+            'risk_level' => $result['risk_level'],
+            'sources_confirming' => $result['sources_confirming'],
+            'sanctions' => $result['sanctions'],
+            'checked_at' => $result['checked_at'],
+            'sources' => $result['sources'],
         ]);
     }
 }
