@@ -39,4 +39,18 @@ return [
         'key' => env('AISSTREAM_API_KEY'),
     ],
 
+    'sanctions_network' => [
+        'url' => env('SANCTIONS_NETWORK_URL', 'https://api.sanctions.network'),
+        'timeout' => (int) env('SANCTIONS_NETWORK_TIMEOUT', 10),
+        'user_agent' => env('SANCTIONS_NETWORK_USER_AGENT', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36'),
+        'referer' => env('SANCTIONS_NETWORK_REFERER', 'https://api.sanctions.network/'),
+    ],
+
+    'fleetleaks' => [
+        'url' => env('FLEETLEAKS_URL', 'https://fleetleaks.com/wp-json/fleetleaks/v1/vessels/map-data'),
+        'timeout' => (int) env('FLEETLEAKS_TIMEOUT', 10),
+        'user_agent' => env('FLEETLEAKS_USER_AGENT', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36'),
+        'referer' => env('FLEETLEAKS_REFERER', 'https://fleetleaks.com/'),
+    ],
+
 ];

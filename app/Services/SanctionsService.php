@@ -21,7 +21,11 @@ class SanctionsService
 
     private const SANCTIONS_NETWORK_URL = 'https://api.sanctions.network';
 
+    private const SANCTIONS_NETWORK_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36';
+
     private const FLEETLEAKS_URL = 'https://fleetleaks.com/wp-json/fleetleaks/v1/vessels/map-data';
+
+    private const FLEETLEAKS_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36';
 
     /**
      * Check if a vessel is sanctioned across all sources
@@ -77,9 +81,19 @@ class SanctionsService
         }
 
         try {
-            $response = Http::timeout(10)
+            $sanctionsNetworkConfig = config('services.sanctions_network', []);
+            $sanctionsNetworkUrl = (string) ($sanctionsNetworkConfig['url'] ?? self::SANCTIONS_NETWORK_URL);
+            $sanctionsNetworkTimeout = (int) ($sanctionsNetworkConfig['timeout'] ?? 10);
+            $sanctionsNetworkUserAgent = (string) ($sanctionsNetworkConfig['user_agent'] ?? self::SANCTIONS_NETWORK_USER_AGENT);
+            $sanctionsNetworkReferer = (string) ($sanctionsNetworkConfig['referer'] ?? 'https://api.sanctions.network/');
+
+            $response = Http::timeout($sanctionsNetworkTimeout)
+                ->withHeaders([
+                    'User-Agent' => $sanctionsNetworkUserAgent,
+                    'Referer' => $sanctionsNetworkReferer,
+                ])
                 ->acceptJson()
-                ->get(rtrim(self::SANCTIONS_NETWORK_URL, '/').'/rpc/search_sanctions', [
+                ->get(rtrim($sanctionsNetworkUrl, '/').'/rpc/search_sanctions', [
                     'name' => $vesselName,
                     'limit' => 25,
                 ]);
@@ -88,6 +102,9 @@ class SanctionsService
                 Log::warning('sanctions.network API error', [
                     'status' => $response->status(),
                     'vessel' => $vesselName,
+                    'url' => $sanctionsNetworkUrl,
+                    'content_type' => $response->header('Content-Type'),
+                    'server' => $response->header('Server'),
                 ]);
 
                 return ['status' => 'error', 'found' => false, 'results' => []];
@@ -165,12 +182,27 @@ class SanctionsService
         }
 
         try {
-            $response = Http::timeout(10)
+            $fleetleaksConfig = config('services.fleetleaks', []);
+            $fleetleaksUrl = (string) ($fleetleaksConfig['url'] ?? self::FLEETLEAKS_URL);
+            $fleetleaksTimeout = (int) ($fleetleaksConfig['timeout'] ?? 10);
+            $fleetleaksUserAgent = (string) ($fleetleaksConfig['user_agent'] ?? self::FLEETLEAKS_USER_AGENT);
+            $fleetleaksReferer = (string) ($fleetleaksConfig['referer'] ?? 'https://fleetleaks.com/');
+
+            $response = Http::timeout($fleetleaksTimeout)
+                ->withHeaders([
+                    'User-Agent' => $fleetleaksUserAgent,
+                    'Referer' => $fleetleaksReferer,
+                ])
                 ->acceptJson()
-                ->get(self::FLEETLEAKS_URL);
+                ->get($fleetleaksUrl);
 
             if (! $response->successful()) {
-                Log::warning('FleetLeaks API error', ['status' => $response->status()]);
+                Log::warning('FleetLeaks API error', [
+                    'status' => $response->status(),
+                    'url' => $fleetleaksUrl,
+                    'content_type' => $response->header('Content-Type'),
+                    'server' => $response->header('Server'),
+                ]);
 
                 return ['status' => 'error', 'found' => false, 'results' => []];
             }

@@ -173,10 +173,6 @@ class IngestAisData extends Command
 
             VesselPosition::create([
                 'mmsi' => $mmsi,
-                'ais_message_id' => data_get($data, 'Message.MessageID'),
-                'repeat_indicator' => data_get($data, 'Message.RepeatIndicator'),
-                'user_id' => data_get($data, 'Message.UserID'),
-                'valid' => data_get($data, 'Message.Valid'),
                 'lat' => $vessel->lat,
                 'lng' => $vessel->lng,
                 'speed' => $vessel->speed,
@@ -185,11 +181,7 @@ class IngestAisData extends Command
                 'navigational_status' => data_get($report, 'NavigationalStatus'),
                 'rate_of_turn' => data_get($report, 'RateOfTurn'),
                 'position_accuracy' => data_get($report, 'PositionAccuracy'),
-                'position_timestamp' => data_get($report, 'Timestamp'),
-                'special_manoeuvre_indicator' => data_get($report, 'SpecialManoeuvreIndicator'),
-                'position_spare' => data_get($report, 'Spare'),
                 'raim' => data_get($report, 'Raim'),
-                'communication_state' => data_get($report, 'CommunicationState'),
                 'recorded_at' => now(),
             ]);
         }
