@@ -204,8 +204,10 @@ class VesselController extends Controller
      * }
      * ]
      * }
-     * @response 404 scenario="No history found" {
-     * "error": "No history found for this time period"
+     * @response 404 scenario="Vessel not found or no history found" {
+     * "error": "No history found for this time period",
+     * "reason": "no_history_found",
+     * "mmsi": 235000123
      * }
      */
     public function history(Request $request, $mmsi): JsonResponse
@@ -213,6 +215,7 @@ class VesselController extends Controller
         if (! Vessel::where('mmsi', $mmsi)->exists()) {
             return response()->json([
                 'error' => 'Vessel not found in SIST records',
+                'reason' => 'vessel_not_found',
                 'mmsi' => (int) $mmsi,
             ], 404);
         }
@@ -254,7 +257,11 @@ class VesselController extends Controller
         });
 
         if ($positions->isEmpty()) {
-            return response()->json(['error' => 'No history found for this time period'], 404);
+            return response()->json([
+                'error' => 'No history found for this time period',
+                'reason' => 'no_history_found',
+                'mmsi' => (int) $mmsi,
+            ], 404);
         }
 
         return response()->json([
@@ -274,16 +281,16 @@ class VesselController extends Controller
      *
      * @queryParam force_refresh boolean Force refresh cached data (default: false). Example: false
      *
-     * @response 200 scenario="Vessel checked - Sanctioned" {
-     * "vessel_name": "EXAMPLE SANCTIONED SHIP",
-     * "imo": 1234567,
-     * "mmsi": 123456789,
-     * "call_sign": "EXCS",
+     * @response 200 scenario="Vessel checked" {
+     * "vessel_name": "LIGOVSKY PROSPECT",
+     * "imo": 9256066,
+     * "mmsi": 273251810,
+     * "call_sign": "UBRZ6",
      * "is_sanctioned": true,
-     * "risk_level": "high",
-     * "sanctions_count": 2,
-     * "sources_confirming": ["sanctions_network", "fleetleaks"],
-     * "checked_at": "2026-04-02T14:15:00+00:00",
+     * "risk_level": "medium",
+     * "sanctions_count": 1,
+     * "sources_confirming": ["sanctions_network"],
+     * "checked_at": "2026-04-13T12:20:07+00:00",
      * "sources": {
      * "sanctions_network": {
      * "status": "ok",
@@ -291,28 +298,26 @@ class VesselController extends Controller
      * "count": 1,
      * "results": [
      * {
-     * "name": "EXAMPLE SANCTIONED SHIP",
-     * "source": "unsc"
+     * "name": "LIGOVSKY PROSPECT",
+     * "source": "ofac",
+     * "source_id": "46288",
+     * "matched_name": "LIGOVSKY PROSPECT"
      * }
      * ]
      * },
      * "fleetleaks": {
      * "status": "ok",
-     * "found": true,
-     * "count": 1,
-     * "results": [
-     * {
-     * "name": "EXAMPLE SANCTIONED SHIP",
-     * "imo": 1234567,
-     * "sanctioned_by": ["UN", "EU"],
-     * "ais_status": "active"
-     * }
-     * ]
+     * "found": false,
+     * "results": []
      * }
      * }
      * }
      * @response 404 scenario="Vessel not found in SIST records" {
      * "error": "Vessel not found in SIST records",
+     * "mmsi": 999999999
+     * }
+     * @response 422 scenario="Insufficient vessel data" {
+     * "error": "Insufficient vessel data for sanctions check",
      * "mmsi": 999999999
      * }
      *

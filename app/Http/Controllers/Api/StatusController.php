@@ -72,6 +72,7 @@ class StatusController extends Controller
      * }
      * @response 503 scenario="Dependency degraded" {
      * "status": "degraded",
+     * "reason": "ais_stream_stale",
      * "checks": {
      * "database": { "status": "ok", "latency_ms": 2 },
      * "cache":    { "status": "ok", "latency_ms": 1 },
@@ -81,11 +82,17 @@ class StatusController extends Controller
      * }
      *
      * @responseField status string Aggregate health: `healthy` if all checks pass, `degraded` if any fail.
-     * @responseField checks object Map of dependency name to its individual health result.
-     * @responseField checks.*.status string `ok`, `degraded`, or `error` for this dependency.
-     * @responseField checks.*.latency_ms integer Round-trip time in milliseconds (present on success).
-     * @responseField checks.*.message string Error detail (present on failure or degradation).
+     * @responseField reason string Top-level degradation reason when status is `degraded`.
+     * @responseField checks.database.status string Database probe result: `ok` or `error`.
+     * @responseField checks.database.latency_ms integer Database round-trip time in milliseconds when healthy.
+     * @responseField checks.database.message string Database error detail when unavailable.
+     * @responseField checks.cache.status string Cache probe result: `ok` or `error`.
+     * @responseField checks.cache.latency_ms integer Cache round-trip time in milliseconds when healthy.
+     * @responseField checks.cache.message string Cache error detail when unavailable.
+     * @responseField checks.ais_stream.status string AIS stream probe result: `ok`, `degraded`, or `error`.
+     * @responseField checks.ais_stream.latency_ms integer AIS stream check duration in milliseconds when available.
      * @responseField checks.ais_stream.last_message_age_seconds integer Seconds since the last ship was updated.
+     * @responseField checks.ais_stream.message string AIS stream error or degradation detail.
      * @responseField timestamp string ISO 8601 server timestamp at time of response.
      */
     public function ready(): JsonResponse
@@ -93,6 +100,7 @@ class StatusController extends Controller
         $checks = [];
         $healthy = true;
         $httpCode = 200;
+        $reason = null;
 
         try {
             $start = hrtime(true);
@@ -104,6 +112,7 @@ class StatusController extends Controller
         } catch (\Throwable $e) {
             $healthy = false;
             $httpCode = 503;
+            $reason = 'database_unavailable';
             $checks['database'] = [
                 'status' => 'error',
                 'message' => 'Database unreachable: '.$e->getMessage(),
@@ -120,6 +129,7 @@ class StatusController extends Controller
         } catch (\Throwable $e) {
             $healthy = false;
             $httpCode = 503;
+            $reason = $reason ?? 'cache_unavailable';
             $checks['cache'] = [
                 'status' => 'error',
                 'message' => 'Cache unreachable: '.$e->getMessage(),
@@ -148,6 +158,7 @@ class StatusController extends Controller
                     ];
                 } elseif ($secondsSinceLastPing <= 300) {
                     $healthy = false;
+                    $reason = $reason ?? 'ais_stream_degraded';
                     $checks['ais_stream'] = [
                         'status' => 'degraded',
                         'latency_ms' => $latencyMs,
@@ -161,6 +172,7 @@ class StatusController extends Controller
             } catch (\Throwable $e) {
                 $healthy = false;
                 $httpCode = 503;
+                $reason = $reason ?? 'ais_stream_stale';
                 $checks['ais_stream'] = [
                     'status' => 'error',
                     'message' => $e->getMessage(),
@@ -175,6 +187,7 @@ class StatusController extends Controller
 
         return response()->json([
             'status' => $healthy ? 'healthy' : 'degraded',
+            'reason' => $reason,
             'checks' => $checks,
             'timestamp' => now()->toIso8601String(),
         ], $httpCode);
