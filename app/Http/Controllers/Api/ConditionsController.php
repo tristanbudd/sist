@@ -26,8 +26,9 @@ class ConditionsController extends Controller
      *
      * @urlParam mmsi integer required The Maritime Mobile Service Identity (MMSI) number. Example: 219225000
      *
-     * @response 404 scenario="Vessel not found" {
-     *   "error": "Vessel not found in SIST records",
+     * @response 404 scenario="Vessel not found or position stale" {
+     *   "error": "No recent vessel position found for this MMSI.",
+     *   "reason": "no_recent_position",
      *   "mmsi": 219225000
      * }
      * @response 200 scenario="Weather snapshot found" {
@@ -74,6 +75,11 @@ class ConditionsController extends Controller
      *   ],
      *   "source": "open-meteo.com"
      * }
+     * @response 502 scenario="Weather provider unavailable" {
+     *   "error": "Unable to fetch weather data right now.",
+     *   "reason": "weather_provider_unavailable",
+     *   "provider_status": 502
+     * }
      */
     public function weather($mmsi): JsonResponse
     {
@@ -82,6 +88,7 @@ class ConditionsController extends Controller
         if (! $vessel) {
             return response()->json([
                 'error' => 'Vessel not found in SIST records',
+                'reason' => 'vessel_not_found',
                 'mmsi' => (int) $mmsi,
             ], 404);
         }
@@ -89,6 +96,7 @@ class ConditionsController extends Controller
         if (! $vessel->last_seen_at || $vessel->last_seen_at->lt(now()->subMinutes(10))) {
             return response()->json([
                 'error' => 'No recent vessel position found for this MMSI.',
+                'reason' => 'no_recent_position',
                 'mmsi' => (int) $mmsi,
             ], 404);
         }
@@ -98,6 +106,7 @@ class ConditionsController extends Controller
         if (! $coordinates) {
             return response()->json([
                 'error' => 'No recent vessel position found for this MMSI.',
+                'reason' => 'no_recent_position',
                 'mmsi' => (int) $mmsi,
             ], 404);
         }
@@ -129,6 +138,7 @@ class ConditionsController extends Controller
         if (! $response->successful()) {
             return response()->json([
                 'error' => 'Unable to fetch weather data right now.',
+                'reason' => 'weather_provider_unavailable',
                 'provider_status' => $response->status(),
             ], 502);
         }
@@ -216,8 +226,9 @@ class ConditionsController extends Controller
      *
      * @urlParam mmsi integer required The Maritime Mobile Service Identity (MMSI) number. Example: 219225000
      *
-     * @response 404 scenario="Vessel not found" {
-     *   "error": "Vessel not found in SIST records",
+     * @response 404 scenario="Vessel not found or position stale" {
+     *   "error": "No recent vessel position found for this MMSI.",
+     *   "reason": "no_recent_position",
      *   "mmsi": 219225000
      * }
      * @response 200 scenario="Tide snapshot found" {
@@ -229,6 +240,11 @@ class ConditionsController extends Controller
      *   },
      *   "position": {
      *     "lat": 56.152,
+     * @response 502 scenario="Marine provider unavailable" {
+     *   "error": "Unable to fetch tide data right now.",
+     *   "reason": "marine_provider_unavailable",
+     *   "details": "Upstream provider unavailable"
+     * }
      *     "lng": 10.214
      *   },
      *   "current": {
@@ -264,6 +280,7 @@ class ConditionsController extends Controller
         if (! $vessel) {
             return response()->json([
                 'error' => 'Vessel not found in SIST records',
+                'reason' => 'vessel_not_found',
                 'mmsi' => (int) $mmsi,
             ], 404);
         }
@@ -271,6 +288,7 @@ class ConditionsController extends Controller
         if (! $vessel->last_seen_at || $vessel->last_seen_at->lt(now()->subMinutes(10))) {
             return response()->json([
                 'error' => 'No recent vessel position found for this MMSI.',
+                'reason' => 'no_recent_position',
                 'mmsi' => (int) $mmsi,
             ], 404);
         }
@@ -280,6 +298,7 @@ class ConditionsController extends Controller
         if (! $coordinates) {
             return response()->json([
                 'error' => 'No recent vessel position found for this MMSI.',
+                'reason' => 'no_recent_position',
                 'mmsi' => (int) $mmsi,
             ], 404);
         }
@@ -289,6 +308,7 @@ class ConditionsController extends Controller
         } catch (\Throwable $e) {
             return response()->json([
                 'error' => 'Unable to fetch tide data right now.',
+                'reason' => 'marine_provider_unavailable',
                 'details' => $e->getMessage(),
             ], 502);
         }
