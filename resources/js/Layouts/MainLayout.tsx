@@ -6,6 +6,7 @@ export default function MainLayout({ children }: PropsWithChildren) {
         <>
             {children}
             <StatusBar />
+            {/* TODO: Add 350px max notice if under 350px */}
         </>
     );
 }
