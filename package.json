@@ -45,7 +45,7 @@
         "prepare": "husky"
     },
     "dependencies": {
-        "@headlessui/react": "^2.2.9",
+        "@headlessui/react": "^2.2.10",
         "@inertiajs/react": "2.0.0",
         "axios": "^1.15.0",
         "react": "^19.2.5",
