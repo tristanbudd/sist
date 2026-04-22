@@ -31,7 +31,7 @@ export default function StatusBar() {
     useEffect(() => {
         const fetchStatus = async () => {
             try {
-                const response = await fetch('https://sist.tristanbudd.com/api/status/ready');
+                const response = await fetch('/api/status/ready');
                 const data = await response.json();
                 setSystemStatus(data);
             } catch (error) {
