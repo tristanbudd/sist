@@ -237,7 +237,7 @@ export default function HeaderBar({ onNavigate }: HeaderBarProps) {
     };
 
     return (
-        <header className="fixed top-0 left-0 right-0 z-50 p-4 flex items-start justify-between pointer-events-none">
+        <header className="fixed top-0 left-0 right-0 z-50 p-2 sm:p-4 flex flex-col sm:flex-row items-center sm:items-start justify-between gap-2 sm:gap-0 pointer-events-none">
             {showSuggestions && (
                 <div
                     className="fixed inset-0 pointer-events-auto z-0"
@@ -245,17 +245,19 @@ export default function HeaderBar({ onNavigate }: HeaderBarProps) {
                 />
             )}
 
-            <div className="relative flex items-center gap-3 bg-zinc-950 border border-white/20 px-4 py-3 shadow-2xl pointer-events-auto z-10">
-                <img src="/images/logo.png" alt="SIST" className="h-7 w-auto" />
+            <div className="relative flex items-center gap-2 sm:gap-3 bg-zinc-950 border border-white/20 px-3 py-2 sm:px-4 sm:py-3 shadow-2xl pointer-events-auto z-10 self-center sm:self-start">
+                <img src="/images/logo.png" alt="SIST" className="h-5 sm:h-7 w-auto" />
                 <div className="flex flex-col justify-center leading-none">
-                    <span className="text-white text-sm font-bold tracking-wider">SIST</span>
-                    <span className="text-zinc-500 text-[9px] font-medium mt-0.5">
+                    <span className="text-white text-xs sm:text-sm font-bold tracking-wider">
+                        SIST
+                    </span>
+                    <span className="text-zinc-500 text-[8px] sm:text-[9px] font-medium mt-0.5 hidden xs:block">
                         Intelligence & Suspicion Tracker
                     </span>
                 </div>
             </div>
 
-            <div className="absolute left-1/2 -translate-x-1/2 w-full max-w-[400px] pointer-events-auto z-10">
+            <div className="relative w-full sm:px-0 sm:max-w-[400px] min-[960px]:absolute min-[960px]:left-1/2 min-[960px]:-translate-x-1/2 pointer-events-auto z-10">
                 <div className="relative flex items-center gap-3 bg-zinc-950 border border-white/20 px-4 py-3 shadow-2xl transition-all focus-within:border-white/40 focus-within:ring-1 focus-within:ring-white/10">
                     <FaSearch className={`w-4 h-4 ${query ? 'text-white' : 'text-zinc-500'}`} />
                     <input
@@ -283,7 +285,7 @@ export default function HeaderBar({ onNavigate }: HeaderBarProps) {
                 )}
 
                 {showSuggestions && !error && suggestions.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 bg-zinc-950 border-x border-b border-white/20 shadow-2xl mt-px max-h-[400px] overflow-y-auto">
+                    <div className="absolute top-full left-0 right-0 bg-zinc-950 border-x border-b border-white/20 shadow-2xl mt-px max-h-[60vh] overflow-y-auto">
                         {!query.trim() && (
                             <div className="px-4 py-2 border-b border-white/5 bg-white/2">
                                 <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-[0.2em]">
