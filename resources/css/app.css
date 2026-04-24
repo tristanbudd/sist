@@ -9,3 +9,27 @@
     --color-black: #0a0a0a;
     --color-foreground: #fefefe;
 }
+
+@layer base {
+    /* Firefox Support */
+    * {
+        scrollbar-width: thin;
+        scrollbar-color: #27272a #09090b;
+    }
+
+    /* Webkit Support (Chrome, Safari, Edge) */
+    ::-webkit-scrollbar {
+        width: 5px;
+        height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+        background: #09090b; /* zinc-950 */
+    }
+    ::-webkit-scrollbar-thumb {
+        background: #27272a; /* zinc-800 */
+        border-radius: 0px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: #3f3f46; /* zinc-700 */
+    }
+}
