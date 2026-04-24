@@ -3,7 +3,10 @@ import StatusBar from '../Components/StatusBar';
 import HeaderBar from '../Components/HeaderBar';
 import { FaDisplay } from 'react-icons/fa6';
 
-export default function MainLayout({ children }: PropsWithChildren) {
+export default function MainLayout({
+    children,
+    header,
+}: PropsWithChildren<{ header?: React.ReactNode }>) {
     return (
         <>
             {/* Unsupported screen notice - shown below 350px */}
@@ -23,7 +26,7 @@ export default function MainLayout({ children }: PropsWithChildren) {
 
             {/* Main content - hidden below 350px */}
             <div className="max-[349px]:hidden min-h-screen bg-zinc-950">
-                <HeaderBar />
+                {header || <HeaderBar />}
                 {children}
                 <StatusBar />
             </div>

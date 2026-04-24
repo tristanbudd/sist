@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { MapContainer, TileLayer, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { FaPlus, FaMinus } from 'react-icons/fa6';
@@ -42,6 +43,23 @@ function ZoomControls() {
     );
 }
 
+/**
+ * Component to handle programmatic map movements (flyTo).
+ * React-Leaflet MapContainer center/zoom props are only for initialization.
+ */
+function MapViewHandler({ center, zoom }: { center: [number, number]; zoom: number }) {
+    const map = useMap();
+
+    useEffect(() => {
+        map.flyTo(center, zoom, {
+            duration: 1.5,
+            easeLinearity: 0.25,
+        });
+    }, [center, zoom, map]);
+
+    return null;
+}
+
 interface MapDisplayProps {
     center?: [number, number];
     zoom?: number;
@@ -65,6 +83,7 @@ export default function MapDisplay({ center = [20, 0], zoom = 3 }: MapDisplayPro
                     url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
                 />
 
+                <MapViewHandler center={center} zoom={zoom} />
                 <ZoomControls />
             </MapContainer>
 

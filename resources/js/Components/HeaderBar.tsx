@@ -7,6 +7,8 @@ interface Vessel {
     mmsi: string;
     imo: string;
     type: string;
+    lat: number;
+    lon: number;
 }
 
 interface Port {
@@ -15,6 +17,8 @@ interface Port {
     code: string;
     country: string;
     type: string;
+    lat: number;
+    lon: number;
 }
 
 type SearchItem = Vessel | Port;
@@ -26,24 +30,62 @@ const SAMPLE_VESSELS: Vessel[] = [
         imo: '9153549',
         type: 'Research',
         category: 'vessel',
+        lat: 51.5074,
+        lon: -0.1278,
     },
-    { name: 'ARCTIC TERN', mmsi: '231001000', imo: '8901234', type: 'Fishing', category: 'vessel' },
-    { name: 'GLOBAL TRADER', mmsi: '351123000', imo: '9412345', type: 'Cargo', category: 'vessel' },
-    { name: 'PACIFIC STAR', mmsi: '563001000', imo: '9876543', type: 'Tanker', category: 'vessel' },
+    {
+        name: 'ARCTIC TERN',
+        mmsi: '231001000',
+        imo: '8901234',
+        type: 'Fishing',
+        category: 'vessel',
+        lat: 64.1265,
+        lon: -21.8174,
+    },
+    {
+        name: 'GLOBAL TRADER',
+        mmsi: '351123000',
+        imo: '9412345',
+        type: 'Cargo',
+        category: 'vessel',
+        lat: 1.2902,
+        lon: 103.8519,
+    },
+    {
+        name: 'PACIFIC STAR',
+        mmsi: '563001000',
+        imo: '9876543',
+        type: 'Tanker',
+        category: 'vessel',
+        lat: 34.0522,
+        lon: -118.2437,
+    },
     {
         name: 'NORTH SEA GIANT',
         mmsi: '257545000',
         imo: '9523964',
         type: 'Offshore',
         category: 'vessel',
+        lat: 58.969,
+        lon: 5.7331,
     },
-    { name: 'BLUE WHALE', mmsi: '477312600', imo: '9616759', type: 'Tug', category: 'vessel' },
+    {
+        name: 'BLUE WHALE',
+        mmsi: '477312600',
+        imo: '9616759',
+        type: 'Tug',
+        category: 'vessel',
+        lat: 22.3193,
+        lon: 114.1694,
+    },
     {
         name: 'EVER GIVEN',
         mmsi: '353136000',
         imo: '9811000',
         type: 'Container',
         category: 'vessel',
+        lat: 29.9745,
+        lon: 32.5418,
     },
     {
         name: 'VIKING GRACE',
@@ -51,6 +93,8 @@ const SAMPLE_VESSELS: Vessel[] = [
         imo: '9606900',
         type: 'Passenger',
         category: 'vessel',
+        lat: 60.4518,
+        lon: 22.2666,
     },
 ];
 
@@ -61,6 +105,8 @@ const SAMPLE_PORTS: Port[] = [
         country: 'Singapore',
         type: 'Main',
         category: 'port',
+        lat: 1.2762,
+        lon: 103.8014,
     },
     {
         name: 'PORT OF ROTTERDAM',
@@ -68,14 +114,26 @@ const SAMPLE_PORTS: Port[] = [
         country: 'Netherlands',
         type: 'Major',
         category: 'port',
+        lat: 51.885,
+        lon: 4.2867,
     },
-    { name: 'PORT OF SHANGHAI', code: 'CNSHA', country: 'China', type: 'Main', category: 'port' },
+    {
+        name: 'PORT OF SHANGHAI',
+        code: 'CNSHA',
+        country: 'China',
+        type: 'Main',
+        category: 'port',
+        lat: 31.2304,
+        lon: 121.4737,
+    },
     {
         name: 'PORT OF LOS ANGELES',
         code: 'USLAX',
         country: 'United States',
         type: 'Major',
         category: 'port',
+        lat: 33.7701,
+        lon: -118.2437,
     },
 ];
 
@@ -132,7 +190,11 @@ const parseVesselCoords = (input: string): { lat: number; lon: number } | null =
     return null;
 };
 
-export default function HeaderBar() {
+interface HeaderBarProps {
+    onNavigate?: (lat: number, lon: number, zoom?: number) => void;
+}
+
+export default function HeaderBar({ onNavigate }: HeaderBarProps) {
     const [query, setQuery] = useState('');
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [limit, setLimit] = useState(5);
@@ -162,6 +224,12 @@ export default function HeaderBar() {
         } else {
             console.info(`ARRIVING AT PORT: ${item.name} (${item.code}, ${item.country})`);
         }
+
+        // Navigate map to item location
+        if (onNavigate) {
+            onNavigate(item.lat, item.lon, 14);
+        }
+
         setQuery(item.name);
         setShowSuggestions(false);
         setLimit(5);
@@ -182,6 +250,11 @@ export default function HeaderBar() {
                     return;
                 }
                 console.info(`NAVIGATING TO COORDINATES: [${lat.toFixed(6)}, ${lon.toFixed(6)}]`);
+
+                if (onNavigate) {
+                    onNavigate(lat, lon, 12);
+                }
+
                 setError(null);
                 setShowSuggestions(false);
                 return;
