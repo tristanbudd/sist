@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { FaSearch, FaShip, FaAnchor } from 'react-icons/fa';
+import portsGeoJson from '../../data/ports.json';
 
 interface Vessel {
     category: 'vessel';
@@ -98,46 +99,18 @@ const SAMPLE_VESSELS: Vessel[] = [
     },
 ];
 
-const SAMPLE_PORTS: Port[] = [
-    {
-        name: 'PORT OF SINGAPORE',
-        code: 'SGSIN',
-        country: 'Singapore',
-        type: 'Main',
-        category: 'port',
-        lat: 1.2762,
-        lon: 103.8014,
-    },
-    {
-        name: 'PORT OF ROTTERDAM',
-        code: 'NLRTM',
-        country: 'Netherlands',
-        type: 'Major',
-        category: 'port',
-        lat: 51.885,
-        lon: 4.2867,
-    },
-    {
-        name: 'PORT OF SHANGHAI',
-        code: 'CNSHA',
-        country: 'China',
-        type: 'Main',
-        category: 'port',
-        lat: 31.2304,
-        lon: 121.4737,
-    },
-    {
-        name: 'PORT OF LOS ANGELES',
-        code: 'USLAX',
-        country: 'United States',
-        type: 'Major',
-        category: 'port',
-        lat: 33.7701,
-        lon: -118.2437,
-    },
-];
+// Map World Bank GeoJSON data to our Port interface
+const WORLD_PORTS: Port[] = (portsGeoJson as any).features.map((feature: any) => ({
+    category: 'port',
+    name: feature.properties.Name.toUpperCase(),
+    code: feature.properties.LOCODE,
+    country: feature.properties.Country,
+    type: feature.properties.Status === 'AI' ? 'Main' : 'Sub',
+    lat: feature.geometry.coordinates[1],
+    lon: feature.geometry.coordinates[0],
+}));
 
-const ALL_RESULTS: SearchItem[] = [...SAMPLE_VESSELS, ...SAMPLE_PORTS];
+const ALL_RESULTS: SearchItem[] = [...SAMPLE_VESSELS, ...WORLD_PORTS];
 
 /**
  * Handles multi-format coordinate parsing (DD, Hemisphere-DD, and DMS)
