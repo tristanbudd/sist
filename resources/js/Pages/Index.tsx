@@ -5,8 +5,6 @@ export default function Index() {
     return (
         <MainLayout>
             <Head title="Home" />
-
-            <p>SIST Loaded</p>
         </MainLayout>
     );
 }
