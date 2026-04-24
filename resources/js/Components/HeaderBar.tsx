@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { FaSearch, FaShip, FaAnchor } from 'react-icons/fa';
 import portsGeoJson from '../../data/ports.json';
+import { Vessel as MapVessel } from './MapDisplay';
 
 interface Vessel {
     name: string;
@@ -29,76 +30,26 @@ interface Coordinates {
 
 interface HeaderBarProps {
     onNavigate?: (lat: number, lon: number, zoom: number) => void;
+    vessels?: MapVessel[];
+    onSelectVessel?: (vessel: MapVessel | null) => void;
+    selectedVesselName?: string;
+    showClusterZoomNotice?: boolean;
 }
 
-const SAMPLE_VESSELS: Vessel[] = [
-    {
-        name: 'OCEAN EXPLORER',
-        mmsi: '235114700',
-        imo: '9153549',
-        category: 'vessel',
-        lat: 51.5074,
-        lon: -0.1278,
-    },
-    {
-        name: 'ARCTIC TERN',
-        mmsi: '231001000',
-        imo: '8901234',
-        category: 'vessel',
-        lat: 64.1265,
-        lon: -21.8174,
-    },
-    {
-        name: 'GLOBAL TRADER',
-        mmsi: '351123000',
-        imo: '9412345',
-        category: 'vessel',
-        lat: 1.2902,
-        lon: 103.8519,
-    },
-    {
-        name: 'PACIFIC STAR',
-        mmsi: '563001000',
-        imo: '9876543',
-        category: 'vessel',
-        lat: 34.0522,
-        lon: -118.2437,
-    },
-    {
-        name: 'NORTH SEA GIANT',
-        mmsi: '257545000',
-        imo: '9523964',
-        category: 'vessel',
-        lat: 58.969,
-        lon: 5.7331,
-    },
-    {
-        name: 'BLUE WHALE',
-        mmsi: '477312600',
-        imo: '9616759',
-        category: 'vessel',
-        lat: 22.3193,
-        lon: 114.1694,
-    },
-    {
-        name: 'EVER GIVEN',
-        mmsi: '353136000',
-        imo: '9811000',
-        category: 'vessel',
-        lat: 29.9745,
-        lon: 32.5418,
-    },
-    {
-        name: 'VIKING GRACE',
-        mmsi: '230629000',
-        imo: '9606900',
-        category: 'vessel',
-        lat: 60.4518,
-        lon: 22.2666,
-    },
-];
+interface PortFeature {
+    properties: {
+        Name: string;
+        LOCODE: string;
+        Country: string;
+    };
+    geometry: {
+        coordinates: [number, number];
+    };
+}
 
-const WORLD_PORTS: Port[] = portsGeoJson.features.map((feature) => ({
+const portsGeoJsonTyped = portsGeoJson as unknown as { features: PortFeature[] };
+
+const WORLD_PORTS: Port[] = portsGeoJsonTyped.features.map((feature: PortFeature) => ({
     category: 'port' as const,
     name: feature.properties.Name.toUpperCase(),
     code: feature.properties.LOCODE,
@@ -106,8 +57,6 @@ const WORLD_PORTS: Port[] = portsGeoJson.features.map((feature) => ({
     lat: feature.geometry.coordinates[1],
     lon: feature.geometry.coordinates[0],
 }));
-
-const ALL_RESULTS: SearchResult[] = [...SAMPLE_VESSELS, ...WORLD_PORTS];
 
 const parseVesselCoords = (input: string): Coordinates | null => {
     const q = input.trim();
@@ -153,16 +102,35 @@ const parseVesselCoords = (input: string): Coordinates | null => {
     return null;
 };
 
-export default function HeaderBar({ onNavigate }: HeaderBarProps) {
+export default function HeaderBar({
+    onNavigate,
+    vessels = [],
+    onSelectVessel,
+    selectedVesselName,
+    showClusterZoomNotice = false,
+}: HeaderBarProps) {
     const [query, setQuery] = useState('');
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [limit, setLimit] = useState(5);
     const [error, setError] = useState<string | null>(null);
+    const activeQuery = selectedVesselName ?? query;
+
+    const allResults = useMemo(() => {
+        const liveVessels: Vessel[] = vessels.map((v) => ({
+            category: 'vessel' as const,
+            name: v.name || 'UNKNOWN',
+            mmsi: String(v.mmsi),
+            imo: String(v.imo || ''),
+            lat: v.lat,
+            lon: v.lng,
+        }));
+        return [...liveVessels, ...WORLD_PORTS];
+    }, [vessels]);
 
     const suggestions = useMemo(() => {
-        const q = query.toUpperCase().trim();
+        const q = activeQuery.toUpperCase().trim();
 
-        const matches = ALL_RESULTS.filter((item: SearchResult) => {
+        const matches = allResults.filter((item: SearchResult) => {
             if (!q) return true;
             if (item.category === 'vessel') {
                 return (
@@ -184,11 +152,20 @@ export default function HeaderBar({ onNavigate }: HeaderBarProps) {
             }
             return a.name.localeCompare(b.name);
         });
-    }, [query]);
+    }, [activeQuery, allResults]);
 
     const displayedSuggestions = useMemo(() => suggestions.slice(0, limit), [suggestions, limit]);
+    const showSuggestionsPanel = showSuggestions && !error && suggestions.length > 0;
 
     const handleSelect = (item: SearchResult) => {
+        if (item.category === 'vessel') {
+            console.info(`FLEET_INTEL: Vessel Search Selection [MMSI: ${item.mmsi}]`);
+            if (onSelectVessel) {
+                const originalVessel = vessels.find((v) => String(v.mmsi) === item.mmsi);
+                onSelectVessel(originalVessel || null);
+            }
+        }
+
         if (onNavigate) {
             onNavigate(item.lat, item.lon, 14);
         }
@@ -201,7 +178,7 @@ export default function HeaderBar({ onNavigate }: HeaderBarProps) {
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter') {
-            const q = query.trim();
+            const q = activeQuery.trim();
             const coords = parseVesselCoords(q);
 
             if (coords) {
@@ -221,7 +198,7 @@ export default function HeaderBar({ onNavigate }: HeaderBarProps) {
             }
 
             const upperQ = q.toUpperCase();
-            const exactMatch = ALL_RESULTS.find((item) => {
+            const exactMatch = allResults.find((item) => {
                 if (item.category === 'vessel') {
                     return item.name === upperQ || item.mmsi === upperQ || item.imo === upperQ;
                 }
@@ -237,30 +214,32 @@ export default function HeaderBar({ onNavigate }: HeaderBarProps) {
     };
 
     return (
-        <header className="fixed top-0 left-0 right-0 z-50 p-4 flex items-start justify-between pointer-events-none">
-            {showSuggestions && (
+        <header className="fixed top-0 left-0 right-0 z-50 p-2 sm:p-4 flex flex-col sm:flex-row items-center sm:items-start justify-between gap-2 sm:gap-0 pointer-events-none">
+            {showSuggestionsPanel && (
                 <div
                     className="fixed inset-0 pointer-events-auto z-0"
                     onClick={() => setShowSuggestions(false)}
                 />
             )}
 
-            <div className="relative flex items-center gap-3 bg-zinc-950 border border-white/20 px-4 py-3 shadow-2xl pointer-events-auto z-10">
-                <img src="/images/logo.png" alt="SIST" className="h-7 w-auto" />
+            <div className="relative flex items-center gap-2 sm:gap-3 bg-zinc-950 border border-white/20 px-3 py-2 sm:px-4 sm:py-3 shadow-2xl pointer-events-auto z-10 self-start">
+                <img src="/images/logo.png" alt="SIST" className="h-5 sm:h-7 w-auto" />
                 <div className="flex flex-col justify-center leading-none">
-                    <span className="text-white text-sm font-bold tracking-wider">SIST</span>
-                    <span className="text-zinc-500 text-[9px] font-medium mt-0.5">
+                    <span className="text-white text-xs sm:text-sm font-bold tracking-wider">
+                        SIST
+                    </span>
+                    <span className="text-zinc-500 text-[8px] sm:text-[9px] font-medium mt-0.5 hidden xs:block">
                         Intelligence & Suspicion Tracker
                     </span>
                 </div>
             </div>
 
-            <div className="absolute left-1/2 -translate-x-1/2 w-full max-w-[400px] pointer-events-auto z-10">
+            <div className="relative w-full sm:px-0 sm:max-w-[400px] min-[960px]:absolute min-[960px]:left-1/2 min-[960px]:-translate-x-1/2 pointer-events-auto z-10">
                 <div className="relative flex items-center gap-3 bg-zinc-950 border border-white/20 px-4 py-3 shadow-2xl transition-all focus-within:border-white/40 focus-within:ring-1 focus-within:ring-white/10">
                     <FaSearch className={`w-4 h-4 ${query ? 'text-white' : 'text-zinc-500'}`} />
                     <input
                         type="text"
-                        value={query}
+                        value={activeQuery}
                         onChange={(e) => {
                             setQuery(e.target.value);
                             setLimit(5);
@@ -282,9 +261,9 @@ export default function HeaderBar({ onNavigate }: HeaderBarProps) {
                     </div>
                 )}
 
-                {showSuggestions && !error && suggestions.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 bg-zinc-950 border-x border-b border-white/20 shadow-2xl mt-px max-h-[400px] overflow-y-auto">
-                        {!query.trim() && (
+                {showSuggestionsPanel && (
+                    <div className="absolute top-full left-0 right-0 bg-zinc-950 border-x border-b border-white/20 shadow-2xl mt-px max-h-[60vh] overflow-y-auto">
+                        {!activeQuery.trim() && (
                             <div className="px-4 py-2 border-b border-white/5 bg-white/2">
                                 <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-[0.2em]">
                                     Quick Search
@@ -301,9 +280,9 @@ export default function HeaderBar({ onNavigate }: HeaderBarProps) {
                         )}
                         {displayedSuggestions
                             .filter((i): i is Vessel => i.category === 'vessel')
-                            .map((item) => (
+                            .map((item, idx) => (
                                 <button
-                                    key={item.mmsi}
+                                    key={`vessel-${item.mmsi}-${idx}`}
                                     onClick={() => handleSelect(item)}
                                     className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-none text-left"
                                 >
@@ -314,7 +293,7 @@ export default function HeaderBar({ onNavigate }: HeaderBarProps) {
                                                 {item.name}
                                             </span>
                                             <span className="text-zinc-500 text-[9px] font-mono">
-                                                MMSI: {item.mmsi} | IMO: {item.imo}
+                                                MMSI: {item.mmsi} | IMO: {item.imo || 'Unknown'}
                                             </span>
                                         </div>
                                     </div>
@@ -332,9 +311,9 @@ export default function HeaderBar({ onNavigate }: HeaderBarProps) {
                         )}
                         {displayedSuggestions
                             .filter((i): i is Port => i.category === 'port')
-                            .map((item) => (
+                            .map((item, idx) => (
                                 <button
-                                    key={item.code}
+                                    key={`port-${item.code}-${idx}`}
                                     onClick={() => handleSelect(item)}
                                     className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-none text-left"
                                 >
@@ -385,6 +364,22 @@ export default function HeaderBar({ onNavigate }: HeaderBarProps) {
                                 </div>
                             )}
                         </div>
+
+                        {showClusterZoomNotice && (
+                            <div className="px-4 py-2 border-t border-white/10 bg-zinc-900/80">
+                                <span className="text-[10px] text-zinc-300 font-semibold uppercase tracking-wider">
+                                    Grouped ships detected, zooming in...
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {showClusterZoomNotice && !showSuggestionsPanel && (
+                    <div className="absolute top-full left-0 right-0 bg-zinc-900/90 border border-white/20 px-4 py-2 mt-px shadow-2xl">
+                        <span className="text-[10px] text-zinc-300 font-semibold uppercase tracking-wider">
+                            Grouped ships detected, zooming in...
+                        </span>
                     </div>
                 )}
             </div>

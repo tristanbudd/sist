@@ -80,7 +80,7 @@ class VesselController extends Controller
                 ->whereBetween('lng', [$request->sw_lng, $request->ne_lng]);
         }
 
-        $vessels = $query->limit(1000)->get();
+        $vessels = $query->get();
 
         if ($vessels->isEmpty()) {
             return response()->json([

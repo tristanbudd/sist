@@ -18,14 +18,19 @@ interface ReadyResponse {
     timestamp: string;
 }
 
-export default function StatusBar() {
+export default function StatusBar({
+    renderedIcons,
+    totalRenderedShips,
+    trackedShips,
+}: {
+    renderedIcons: number;
+    totalRenderedShips: number;
+    trackedShips: number;
+}) {
     const [systemStatus, setSystemStatus] = useState<ReadyResponse | null>(null);
     const [showDetails, setShowDetails] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
 
-    // TODO: Replace with real data from API
-    const renderedVessels = -1;
-    const trackedVessels = -1;
     const currentArea = 'LOCATION PLACEHOLDER';
 
     useEffect(() => {
@@ -72,9 +77,16 @@ export default function StatusBar() {
             <div className="fixed bottom-0 left-0 right-0 h-8 bg-zinc-950 border-t border-zinc-800/50 flex items-center justify-between px-4 text-zinc-400 text-[11px] font-medium z-100">
                 {/* Left section - Stats */}
                 <div className="flex items-center gap-3 overflow-x-auto">
-                    <StatItem label="Rendered" value={renderedVessels.toLocaleString()} />
+                    <StatItem
+                        label="Rendered"
+                        value={
+                            renderedIcons === totalRenderedShips
+                                ? totalRenderedShips.toLocaleString()
+                                : `${renderedIcons.toLocaleString()} (${totalRenderedShips.toLocaleString()} Total)`
+                        }
+                    />
                     <Divider />
-                    <StatItem label="Tracked" value={trackedVessels.toLocaleString()} />
+                    <StatItem label="Tracked" value={trackedShips.toLocaleString()} />
                     <Divider />
                     <span className="text-zinc-500 text-[10px] whitespace-nowrap hidden sm:inline">
                         {currentArea}
@@ -155,8 +167,11 @@ export default function StatusBar() {
                 </div>
             </div>
 
-            {showDetails && (
-                <div className="fixed inset-0 z-99" onClick={() => setShowDetails(false)} />
+            {showDetails && systemStatus && (
+                <div
+                    className="fixed inset-0 z-99 bg-transparent"
+                    onClick={() => setShowDetails(false)}
+                />
             )}
         </>
     );
