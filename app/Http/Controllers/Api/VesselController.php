@@ -53,6 +53,10 @@ class VesselController extends Controller
         $age = $request->input('age_minutes', 60);
         $query->where('last_seen_at', '>=', now()->subMinutes($age));
 
+        $ignoredNames = ['--'];
+        $query->whereNotNull('name')
+            ->whereNotIn('name', $ignoredNames);
+
         if ($request->has(['sw_lat', 'sw_lng', 'ne_lat', 'ne_lng'])) {
             $query->whereBetween('lat', [(float) $request->sw_lat, (float) $request->ne_lat])
                 ->whereBetween('lng', [(float) $request->sw_lng, (float) $request->ne_lng]);

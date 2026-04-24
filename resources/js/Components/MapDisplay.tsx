@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { MapContainer, TileLayer, useMap, Marker, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, useMap, Marker, Popup, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { FaPlus, FaMinus } from 'react-icons/fa6';
 import L from 'leaflet';
@@ -33,20 +33,31 @@ interface ClusteredVessel extends Vessel {
     clusterCount: number;
 }
 
+const IGNORED_VESSEL_NAMES = ['--'];
+
 function normalizeVessels(raw: Vessel[]): Vessel[] {
     const byMmsi = new Map<number, Vessel>();
 
     for (const vessel of raw) {
+        const trimmedName = (vessel.name || '').trim().toUpperCase();
+
+        // Ignore ships with placeholder names
+        if (!trimmedName || IGNORED_VESSEL_NAMES.includes(trimmedName)) {
+            continue;
+        }
+
         const existing = byMmsi.get(vessel.mmsi);
         if (!existing) {
             byMmsi.set(vessel.mmsi, vessel);
             continue;
         }
 
-        const existingName = (existing.name || '').trim();
-        const currentName = (vessel.name || '').trim();
-        const existingHasUsefulName = existingName.length > 2 && existingName !== 'UNKNOWN';
-        const currentHasUsefulName = currentName.length > 2 && currentName !== 'UNKNOWN';
+        const existingName = (existing.name || '').trim().toUpperCase();
+        const currentName = (vessel.name || '').trim().toUpperCase();
+        const existingHasUsefulName =
+            existingName.length > 2 && !IGNORED_VESSEL_NAMES.includes(existingName);
+        const currentHasUsefulName =
+            currentName.length > 2 && !IGNORED_VESSEL_NAMES.includes(currentName);
 
         if (currentHasUsefulName && !existingHasUsefulName) {
             byMmsi.set(vessel.mmsi, vessel);
@@ -455,7 +466,23 @@ function PortLayer() {
                     key={`port-${port.properties.LOCODE}-${idx}`}
                     position={[port.geometry.coordinates[1], port.geometry.coordinates[0]]}
                     icon={portIcon}
-                />
+                >
+                    <Popup className="vessel-popup">
+                        <div className="bg-zinc-950 text-white p-1 min-w-[180px]">
+                            <div className="border-b border-white/10 pb-1 mb-1 pr-8">
+                                <span className="font-bold text-xs uppercase tracking-wider text-cyan-400">
+                                    {port.properties.Name}
+                                </span>
+                            </div>
+                            <div className="text-[10px] text-zinc-400">
+                                {port.properties.Country}
+                            </div>
+                            <div className="text-[9px] text-zinc-500 font-mono mt-1">
+                                {port.properties.LOCODE}
+                            </div>
+                        </div>
+                    </Popup>
+                </Marker>
             ))}
         </>
     );

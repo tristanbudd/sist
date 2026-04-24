@@ -241,6 +241,9 @@ export default function HeaderBar({
                         type="text"
                         value={activeQuery}
                         onChange={(e) => {
+                            if (selectedVesselName && onSelectVessel) {
+                                onSelectVessel(null);
+                            }
                             setQuery(e.target.value);
                             setLimit(5);
                             setError(null);
