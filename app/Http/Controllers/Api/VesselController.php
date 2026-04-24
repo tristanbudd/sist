@@ -28,6 +28,7 @@ class VesselController extends Controller
      * @queryParam ne_lat float North-East Latitude (Bounding Box). Example: 51.5
      * @queryParam ne_lng float North-East Longitude (Bounding Box). Example: 2.0
      * @queryParam age_minutes integer Filter out vessels not seen in this many minutes. Defaults to 60 (1 hour). Example: 30
+     * @queryParam offset integer The number of records to skip. Use with a limit of 2500 for pagination. Example: 2500
      *
      * @response 200 scenario="Success" {
      * "data": [
@@ -35,32 +36,9 @@ class VesselController extends Controller
      * "mmsi": 219225000,
      * "imo": 9326093,
      * "name": "MAERSK NORFOLK",
-     * "call_sign": "OWDQ2",
-     * "type": 70,
-     * "navigational_status": 0,
      * "lat": 51.9542,
      * "lng": 1.2589,
-     * "speed": 18.5,
-     * "course": 210.0,
-     * "heading": 212,
-     * "length": 299,
-     * "width": 40,
-     * "draught": 12.5,
-     * "destination": "FELIXSTOWE",
-     * "eta": "2026-04-03T14:30:00.000000Z",
-     * "last_seen_at": "2026-04-02T14:15:00.000000Z",
-     * "nav_status_text": "Under way using engine",
-     * "vessel_type_text": "Cargo",
-     * "flying_flag": "DK",
-     * "flying_flag_country": "Denmark",
-     * "flying_flag_continent": "Europe",
-     * "flying_flag_local_time": "2026-04-02 16:15:00",
-     * "flying_flag_timezone": "Europe/Copenhagen",
-     * "registry_country": "Denmark",
-     * "registry_country_code": "DK",
-     * "registry_continent": "Europe",
-     * "registry_local_time": "2026-04-02 16:15:00",
-     * "registry_timezone": "Europe/Copenhagen"
+     * "course": 210.0
      * }
      * ]
      * }
@@ -76,11 +54,21 @@ class VesselController extends Controller
         $query->where('last_seen_at', '>=', now()->subMinutes($age));
 
         if ($request->has(['sw_lat', 'sw_lng', 'ne_lat', 'ne_lng'])) {
-            $query->whereBetween('lat', [$request->sw_lat, $request->ne_lat])
-                ->whereBetween('lng', [$request->sw_lng, $request->ne_lng]);
+            $query->whereBetween('lat', [(float) $request->sw_lat, (float) $request->ne_lat])
+                ->whereBetween('lng', [(float) $request->sw_lng, (float) $request->ne_lng]);
         }
 
-        $vessels = $query->get();
+        $vessels = $query->orderBy('last_seen_at', 'desc')
+            ->offset($request->input('offset', 0))
+            ->limit(2500)
+            ->get([
+                'mmsi',
+                'imo',
+                'name',
+                'lat',
+                'lng',
+                'course',
+            ]);
 
         if ($vessels->isEmpty()) {
             return response()->json([

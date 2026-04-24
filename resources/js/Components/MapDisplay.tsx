@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { MapContainer, TileLayer, useMap, Marker, Popup, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, useMap, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { FaPlus, FaMinus, FaShip, FaGaugeHigh, FaCompass, FaCircleInfo } from 'react-icons/fa6';
+import { FaPlus, FaMinus } from 'react-icons/fa6';
 import L from 'leaflet';
 import axios from 'axios';
 import portsData from '../../data/ports.json';
@@ -25,11 +25,7 @@ export interface Vessel {
     name: string;
     lat: number;
     lng: number;
-    speed: number;
     course: number;
-    vessel_type_text: string;
-    last_seen_at: string;
-    destination?: string;
 }
 
 interface ClusteredVessel extends Vessel {
@@ -47,22 +43,12 @@ function normalizeVessels(raw: Vessel[]): Vessel[] {
             continue;
         }
 
-        const existingSeen = existing.last_seen_at ? Date.parse(existing.last_seen_at) : 0;
-        const currentSeen = vessel.last_seen_at ? Date.parse(vessel.last_seen_at) : 0;
         const existingName = (existing.name || '').trim();
         const currentName = (vessel.name || '').trim();
         const existingHasUsefulName = existingName.length > 2 && existingName !== 'UNKNOWN';
         const currentHasUsefulName = currentName.length > 2 && currentName !== 'UNKNOWN';
 
-        const shouldReplace =
-            currentSeen > existingSeen ||
-            (currentHasUsefulName && !existingHasUsefulName) ||
-            (currentHasUsefulName &&
-                existingHasUsefulName &&
-                currentName.length > existingName.length &&
-                currentSeen >= existingSeen);
-
-        if (shouldReplace) {
+        if (currentHasUsefulName && !existingHasUsefulName) {
             byMmsi.set(vessel.mmsi, vessel);
         }
     }
@@ -153,20 +139,45 @@ function FleetLayer({
 
     const fetchTrackedSearchVessels = useCallback(async () => {
         if (isIdle) return;
+
+        let allVessels: Vessel[] = [];
+        let offset = 0;
+        let hasMore = true;
+        const BATCH_LIMIT = 2500;
+
         try {
-            const response = await axios.get('https://sist.tristanbudd.com/api/vessels', {
-                params: { age_minutes: 60 },
-            });
-            const data = normalizeVessels(response.data.data || []);
-            setTrackedCount(data.length);
-            setTrackedSearchVessels(data);
+            while (hasMore) {
+                const response = await axios.get('https://sist.tristanbudd.com/api/vessels', {
+                    params: {
+                        age_minutes: 60,
+                        offset: offset,
+                    },
+                });
+
+                const batch = response.data.data || [];
+                allVessels = [...allVessels, ...batch];
+
+                if (batch.length < BATCH_LIMIT) {
+                    hasMore = false;
+                } else {
+                    offset += BATCH_LIMIT;
+                }
+
+                if (offset >= 100000) break;
+            }
+
+            const normalized = normalizeVessels(allVessels);
+            setTrackedCount(normalized.length);
+            setTrackedSearchVessels(normalized);
         } catch (error) {
             if (axios.isAxiosError(error) && error.response?.status === 404) {
-                setTrackedCount(0);
-                setTrackedSearchVessels([]);
+                if (offset === 0) {
+                    setTrackedCount(0);
+                    setTrackedSearchVessels([]);
+                }
                 return;
             }
-            console.error('Failed to fetch global fleet count:', error);
+            console.error('Failed to fetch global fleet:', error);
         }
     }, [isIdle]);
 
@@ -362,75 +373,7 @@ function FleetLayer({
                         mousedown: (e) => handleMarkerClick(vessel, e),
                         click: (e) => handleMarkerClick(vessel, e),
                     }}
-                >
-                    {windowVessels.length < 0 && (
-                        <Popup className="vessel-popup" closeButton={false}>
-                            <div className="bg-zinc-950 text-white p-1 min-w-[220px]">
-                                <div className="border-b border-white/10 pb-2 mb-2 pr-8 flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <FaShip className="text-zinc-400" />
-                                        <span className="font-bold text-xs uppercase tracking-wider">
-                                            {vessel.isCluster
-                                                ? 'Multiple Vessels'
-                                                : vessel.name || 'Unknown'}
-                                        </span>
-                                    </div>
-                                    {vessel.isCluster && (
-                                        <span className="bg-white/10 px-1.5 py-0.5 text-[9px] font-black">
-                                            {vessel.clusterCount}
-                                        </span>
-                                    )}
-                                </div>
-
-                                {!vessel.isCluster ? (
-                                    <div className="grid grid-cols-2 gap-y-2 text-[10px]">
-                                        <div className="text-zinc-500 uppercase font-bold">
-                                            Type
-                                        </div>
-                                        <div>{vessel.vessel_type_text || 'Unknown'}</div>
-
-                                        <div className="text-zinc-500 uppercase font-bold flex items-center gap-1">
-                                            <FaGaugeHigh /> Speed
-                                        </div>
-                                        <div>{vessel.speed?.toFixed(1) || '0.0'} kn</div>
-
-                                        <div className="text-zinc-500 uppercase font-bold flex items-center gap-1">
-                                            <FaCompass /> Course
-                                        </div>
-                                        <div>{vessel.course || '0'}°</div>
-
-                                        <div className="text-zinc-500 uppercase font-bold">
-                                            MMSI
-                                        </div>
-                                        <div className="font-mono">{vessel.mmsi}</div>
-
-                                        <div className="text-zinc-500 uppercase font-bold">IMO</div>
-                                        <div className="font-mono">{vessel.imo || 'Unknown'}</div>
-
-                                        {vessel.destination && (
-                                            <>
-                                                <div className="text-zinc-500 uppercase font-bold">
-                                                    Dest
-                                                </div>
-                                                <div className="truncate">{vessel.destination}</div>
-                                            </>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div className="border border-white/20 bg-zinc-900/60 px-2 py-2">
-                                        <div className="flex items-center gap-2 text-cyan-300 text-[10px] font-bold uppercase tracking-wider">
-                                            <FaCircleInfo />
-                                            Multiple vessels grouped
-                                        </div>
-                                        <div className="text-[10px] text-zinc-300 mt-1">
-                                            Zoom in to separate and select an individual vessel.
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </Popup>
-                    )}
-                </Marker>
+                />
             ))}
         </>
     );
@@ -512,23 +455,7 @@ function PortLayer() {
                     key={`port-${port.properties.LOCODE}-${idx}`}
                     position={[port.geometry.coordinates[1], port.geometry.coordinates[0]]}
                     icon={portIcon}
-                >
-                    <Popup className="vessel-popup">
-                        <div className="bg-zinc-950 text-white p-1 min-w-[180px]">
-                            <div className="border-b border-white/10 pb-1 mb-1 pr-8">
-                                <span className="font-bold text-xs uppercase tracking-wider text-cyan-400">
-                                    {port.properties.Name}
-                                </span>
-                            </div>
-                            <div className="text-[10px] text-zinc-400">
-                                {port.properties.Country}
-                            </div>
-                            <div className="text-[9px] text-zinc-500 font-mono mt-1">
-                                {port.properties.LOCODE}
-                            </div>
-                        </div>
-                    </Popup>
-                </Marker>
+                />
             ))}
         </>
     );
