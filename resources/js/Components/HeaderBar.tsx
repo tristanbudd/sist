@@ -31,6 +31,9 @@ interface Coordinates {
 interface HeaderBarProps {
     onNavigate?: (lat: number, lon: number, zoom: number) => void;
     vessels?: MapVessel[];
+    onSelectVessel?: (vessel: MapVessel | null) => void;
+    selectedVesselName?: string;
+    showClusterZoomNotice?: boolean;
 }
 
 interface PortFeature {
@@ -99,11 +102,18 @@ const parseVesselCoords = (input: string): Coordinates | null => {
     return null;
 };
 
-export default function HeaderBar({ onNavigate, vessels = [] }: HeaderBarProps) {
+export default function HeaderBar({
+    onNavigate,
+    vessels = [],
+    onSelectVessel,
+    selectedVesselName,
+    showClusterZoomNotice = false,
+}: HeaderBarProps) {
     const [query, setQuery] = useState('');
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [limit, setLimit] = useState(5);
     const [error, setError] = useState<string | null>(null);
+    const activeQuery = selectedVesselName ?? query;
 
     const allResults = useMemo(() => {
         const liveVessels: Vessel[] = vessels.map((v) => ({
@@ -118,7 +128,7 @@ export default function HeaderBar({ onNavigate, vessels = [] }: HeaderBarProps) 
     }, [vessels]);
 
     const suggestions = useMemo(() => {
-        const q = query.toUpperCase().trim();
+        const q = activeQuery.toUpperCase().trim();
 
         const matches = allResults.filter((item: SearchResult) => {
             if (!q) return true;
@@ -142,13 +152,18 @@ export default function HeaderBar({ onNavigate, vessels = [] }: HeaderBarProps) 
             }
             return a.name.localeCompare(b.name);
         });
-    }, [query, allResults]);
+    }, [activeQuery, allResults]);
 
     const displayedSuggestions = useMemo(() => suggestions.slice(0, limit), [suggestions, limit]);
+    const showSuggestionsPanel = showSuggestions && !error && suggestions.length > 0;
 
     const handleSelect = (item: SearchResult) => {
         if (item.category === 'vessel') {
             console.info(`FLEET_INTEL: Vessel Search Selection [MMSI: ${item.mmsi}]`);
+            if (onSelectVessel) {
+                const originalVessel = vessels.find((v) => String(v.mmsi) === item.mmsi);
+                onSelectVessel(originalVessel || null);
+            }
         }
 
         if (onNavigate) {
@@ -163,7 +178,7 @@ export default function HeaderBar({ onNavigate, vessels = [] }: HeaderBarProps) 
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter') {
-            const q = query.trim();
+            const q = activeQuery.trim();
             const coords = parseVesselCoords(q);
 
             if (coords) {
@@ -200,14 +215,14 @@ export default function HeaderBar({ onNavigate, vessels = [] }: HeaderBarProps) 
 
     return (
         <header className="fixed top-0 left-0 right-0 z-50 p-2 sm:p-4 flex flex-col sm:flex-row items-center sm:items-start justify-between gap-2 sm:gap-0 pointer-events-none">
-            {showSuggestions && (
+            {showSuggestionsPanel && (
                 <div
                     className="fixed inset-0 pointer-events-auto z-0"
                     onClick={() => setShowSuggestions(false)}
                 />
             )}
 
-            <div className="relative flex items-center gap-2 sm:gap-3 bg-zinc-950 border border-white/20 px-3 py-2 sm:px-4 sm:py-3 shadow-2xl pointer-events-auto z-10 self-center sm:self-start">
+            <div className="relative flex items-center gap-2 sm:gap-3 bg-zinc-950 border border-white/20 px-3 py-2 sm:px-4 sm:py-3 shadow-2xl pointer-events-auto z-10 self-start">
                 <img src="/images/logo.png" alt="SIST" className="h-5 sm:h-7 w-auto" />
                 <div className="flex flex-col justify-center leading-none">
                     <span className="text-white text-xs sm:text-sm font-bold tracking-wider">
@@ -224,7 +239,7 @@ export default function HeaderBar({ onNavigate, vessels = [] }: HeaderBarProps) 
                     <FaSearch className={`w-4 h-4 ${query ? 'text-white' : 'text-zinc-500'}`} />
                     <input
                         type="text"
-                        value={query}
+                        value={activeQuery}
                         onChange={(e) => {
                             setQuery(e.target.value);
                             setLimit(5);
@@ -246,9 +261,9 @@ export default function HeaderBar({ onNavigate, vessels = [] }: HeaderBarProps) 
                     </div>
                 )}
 
-                {showSuggestions && !error && suggestions.length > 0 && (
+                {showSuggestionsPanel && (
                     <div className="absolute top-full left-0 right-0 bg-zinc-950 border-x border-b border-white/20 shadow-2xl mt-px max-h-[60vh] overflow-y-auto">
-                        {!query.trim() && (
+                        {!activeQuery.trim() && (
                             <div className="px-4 py-2 border-b border-white/5 bg-white/2">
                                 <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-[0.2em]">
                                     Quick Search
@@ -278,7 +293,7 @@ export default function HeaderBar({ onNavigate, vessels = [] }: HeaderBarProps) 
                                                 {item.name}
                                             </span>
                                             <span className="text-zinc-500 text-[9px] font-mono">
-                                                MMSI: {item.mmsi} | IMO: {item.imo}
+                                                MMSI: {item.mmsi} | IMO: {item.imo || 'Unknown'}
                                             </span>
                                         </div>
                                     </div>
@@ -349,6 +364,22 @@ export default function HeaderBar({ onNavigate, vessels = [] }: HeaderBarProps) 
                                 </div>
                             )}
                         </div>
+
+                        {showClusterZoomNotice && (
+                            <div className="px-4 py-2 border-t border-white/10 bg-zinc-900/80">
+                                <span className="text-[10px] text-zinc-300 font-semibold uppercase tracking-wider">
+                                    Grouped ships detected, zooming in...
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {showClusterZoomNotice && !showSuggestionsPanel && (
+                    <div className="absolute top-full left-0 right-0 bg-zinc-900/90 border border-white/20 px-4 py-2 mt-px shadow-2xl">
+                        <span className="text-[10px] text-zinc-300 font-semibold uppercase tracking-wider">
+                            Grouped ships detected, zooming in...
+                        </span>
                     </div>
                 )}
             </div>

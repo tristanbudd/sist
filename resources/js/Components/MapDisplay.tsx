@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { MapContainer, TileLayer, useMap, Marker, Popup, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { FaPlus, FaMinus, FaShip, FaGaugeHigh, FaCompass } from 'react-icons/fa6';
+import { FaPlus, FaMinus, FaShip, FaGaugeHigh, FaCompass, FaCircleInfo } from 'react-icons/fa6';
 import L from 'leaflet';
 import axios from 'axios';
 import portsData from '../../data/ports.json';
@@ -37,8 +37,44 @@ interface ClusteredVessel extends Vessel {
     clusterCount: number;
 }
 
+function normalizeVessels(raw: Vessel[]): Vessel[] {
+    const byMmsi = new Map<number, Vessel>();
+
+    for (const vessel of raw) {
+        const existing = byMmsi.get(vessel.mmsi);
+        if (!existing) {
+            byMmsi.set(vessel.mmsi, vessel);
+            continue;
+        }
+
+        const existingSeen = existing.last_seen_at ? Date.parse(existing.last_seen_at) : 0;
+        const currentSeen = vessel.last_seen_at ? Date.parse(vessel.last_seen_at) : 0;
+        const existingName = (existing.name || '').trim();
+        const currentName = (vessel.name || '').trim();
+        const existingHasUsefulName = existingName.length > 2 && existingName !== 'UNKNOWN';
+        const currentHasUsefulName = currentName.length > 2 && currentName !== 'UNKNOWN';
+
+        const shouldReplace =
+            currentSeen > existingSeen ||
+            (currentHasUsefulName && !existingHasUsefulName) ||
+            (currentHasUsefulName &&
+                existingHasUsefulName &&
+                currentName.length > existingName.length &&
+                currentSeen >= existingSeen);
+
+        if (shouldReplace) {
+            byMmsi.set(vessel.mmsi, vessel);
+        }
+    }
+
+    return Array.from(byMmsi.values());
+}
+
 function FleetLayer({
     onUpdate,
+    selectedMmsi,
+    onVesselSelect,
+    onClusterZoomNotice,
 }: {
     onUpdate?: (stats: {
         renderedIcons: number;
@@ -46,11 +82,14 @@ function FleetLayer({
         trackedShips: number;
         trackedVessels: Vessel[];
     }) => void;
+    selectedMmsi: number | null;
+    onVesselSelect?: (vessel: Vessel | null) => void;
+    onClusterZoomNotice?: () => void;
 }) {
     const map = useMap();
-    const [vessels, setVessels] = useState<Vessel[]>([]);
+    const [windowVessels, setWindowVessels] = useState<Vessel[]>([]);
     const [trackedCount, setTrackedCount] = useState(0);
-    const [trackedVessels, setTrackedVessels] = useState<Vessel[]>([]);
+    const [trackedSearchVessels, setTrackedSearchVessels] = useState<Vessel[]>([]);
     const [zoom, setZoom] = useState(map.getZoom());
     const fetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -58,6 +97,8 @@ function FleetLayer({
     const abortControllerRef = useRef<AbortController | null>(null);
     const [lastActivity, setLastActivity] = useState(Date.now());
     const [isIdle, setIsIdle] = useState(false);
+    const suppressNextMapClickRef = useRef(false);
+    const lastClusterInteractionRef = useRef<{ mmsi: number; at: number } | null>(null);
     const IDLE_THRESHOLD = 120000;
 
     const recordActivity = useCallback(() => {
@@ -65,7 +106,7 @@ function FleetLayer({
         if (isIdle) setIsIdle(false);
     }, [isIdle]);
 
-    const fetchVessels = useCallback(
+    const fetchWindowVessels = useCallback(
         async (force = false) => {
             if (isIdle && !force) return;
 
@@ -91,11 +132,16 @@ function FleetLayer({
                         age_minutes: 60,
                     },
                 });
-                setVessels(response.data.data || []);
+                const data = normalizeVessels(response.data.data || []);
+                setWindowVessels(data);
             } catch (error) {
                 if (axios.isCancel(error)) return;
+                if (axios.isAxiosError(error) && error.response?.status === 404) {
+                    setWindowVessels([]);
+                    return;
+                }
                 console.error('Failed to fetch fleet data:', error);
-                setVessels([]);
+                setWindowVessels([]);
             } finally {
                 if (abortControllerRef.current === controller) {
                     abortControllerRef.current = null;
@@ -105,16 +151,21 @@ function FleetLayer({
         [map, isIdle]
     );
 
-    const fetchTrackedCount = useCallback(async () => {
+    const fetchTrackedSearchVessels = useCallback(async () => {
         if (isIdle) return;
         try {
             const response = await axios.get('https://sist.tristanbudd.com/api/vessels', {
                 params: { age_minutes: 60 },
             });
-            const data = response.data.data || [];
+            const data = normalizeVessels(response.data.data || []);
             setTrackedCount(data.length);
-            setTrackedVessels(data);
+            setTrackedSearchVessels(data);
         } catch (error) {
+            if (axios.isAxiosError(error) && error.response?.status === 404) {
+                setTrackedCount(0);
+                setTrackedSearchVessels([]);
+                return;
+            }
             console.error('Failed to fetch global fleet count:', error);
         }
     }, [isIdle]);
@@ -124,9 +175,9 @@ function FleetLayer({
             clearTimeout(fetchTimer.current);
         }
         fetchTimer.current = setTimeout(() => {
-            fetchVessels();
+            fetchWindowVessels();
         }, 400);
-    }, [fetchVessels]);
+    }, [fetchWindowVessels]);
 
     useMapEvents({
         moveend: () => {
@@ -137,7 +188,22 @@ function FleetLayer({
             recordActivity();
             debouncedFetch();
         },
-        click: recordActivity,
+        click: (e) => {
+            recordActivity();
+            const target = e.originalEvent?.target as HTMLElement | null;
+            if (
+                target?.closest(
+                    '.leaflet-marker-icon, .leaflet-popup, .leaflet-popup-content, .leaflet-interactive'
+                )
+            ) {
+                return;
+            }
+            if (suppressNextMapClickRef.current) {
+                suppressNextMapClickRef.current = false;
+                return;
+            }
+            if (onVesselSelect) onVesselSelect(null);
+        },
         dragstart: recordActivity,
         mousedown: recordActivity,
     });
@@ -152,11 +218,11 @@ function FleetLayer({
     }, [lastActivity]);
 
     useEffect(() => {
-        fetchVessels(true);
-        fetchTrackedCount();
+        fetchWindowVessels(true);
+        fetchTrackedSearchVessels();
 
-        pollTimer.current = setInterval(() => fetchVessels(), 15000);
-        trackedTimer.current = setInterval(() => fetchTrackedCount(), 300000);
+        pollTimer.current = setInterval(() => fetchWindowVessels(), 15000);
+        trackedTimer.current = setInterval(() => fetchTrackedSearchVessels(), 300000);
 
         return () => {
             if (fetchTimer.current) clearTimeout(fetchTimer.current);
@@ -164,17 +230,17 @@ function FleetLayer({
             if (trackedTimer.current) clearInterval(trackedTimer.current);
             if (abortControllerRef.current) abortControllerRef.current.abort();
         };
-    }, [fetchVessels, fetchTrackedCount]);
+    }, [fetchWindowVessels, fetchTrackedSearchVessels]);
 
     const visibleVessels = useMemo(() => {
         const filtered: ClusteredVessel[] = [];
         const minDistancePx = zoom < 6 ? 10 : zoom < 11 ? 6 : 0;
 
         if (minDistancePx === 0) {
-            return vessels.map((v) => ({ ...v, isCluster: false, clusterCount: 1 }));
+            return windowVessels.map((v) => ({ ...v, isCluster: false, clusterCount: 1 }));
         }
 
-        vessels.forEach((vessel) => {
+        windowVessels.forEach((vessel) => {
             const pos = map.latLngToLayerPoint([vessel.lat, vessel.lng]);
             const clusterIndex = filtered.findIndex((f) => {
                 const fPos = map.latLngToLayerPoint([f.lat, f.lng]);
@@ -191,7 +257,7 @@ function FleetLayer({
         });
 
         return filtered;
-    }, [vessels, map, zoom]);
+    }, [windowVessels, map, zoom]);
 
     useEffect(() => {
         if (onUpdate) {
@@ -199,13 +265,13 @@ function FleetLayer({
             onUpdate({
                 renderedIcons: visibleVessels.length,
                 totalRenderedShips,
-                trackedShips: Math.max(trackedCount, totalRenderedShips),
-                trackedVessels,
+                trackedShips: trackedCount,
+                trackedVessels: trackedSearchVessels,
             });
         }
-    }, [visibleVessels, trackedCount, trackedVessels, onUpdate]);
+    }, [visibleVessels, trackedCount, trackedSearchVessels, onUpdate]);
 
-    const createVesselIcon = (course: number, isCluster: boolean) => {
+    const createVesselIcon = (course: number, isCluster: boolean, isSelected: boolean) => {
         const singleArrow = `
             <path d="M12 2L4.5 20.29L5.21 21L12 18L18.79 21L19.5 20.29L12 2Z" />
         `;
@@ -214,11 +280,13 @@ function FleetLayer({
             <path d="M12 8L7 20L12 18L17 20L12 8Z" opacity="0.6" />
         `;
 
+        const color = isSelected ? '#ef4444' : 'white';
+
         return L.divIcon({
             className: 'vessel-icon-container',
             html: `
                 <div style="transform: rotate(${course}deg); display: flex; align-items: center; justify-content: center;">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="white" stroke="black" stroke-width="1">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="${color}" stroke="black" stroke-width="1">
                         ${isCluster ? doubleArrow : singleArrow}
                     </svg>
                 </div>
@@ -228,11 +296,40 @@ function FleetLayer({
         });
     };
 
+    const handleClusterInteraction = (vessel: ClusteredVessel) => {
+        const now = Date.now();
+        const last = lastClusterInteractionRef.current;
+        if (last && last.mmsi === vessel.mmsi && now - last.at < 250) return;
+        lastClusterInteractionRef.current = { mmsi: vessel.mmsi, at: now };
+
+        suppressNextMapClickRef.current = true;
+        if (onVesselSelect) onVesselSelect(null);
+        if (onClusterZoomNotice) onClusterZoomNotice();
+        const nextZoom = Math.min(Math.max(map.getZoom() + 2, 11), 14);
+        map.flyTo([vessel.lat, vessel.lng], nextZoom, {
+            duration: 0.7,
+            easeLinearity: 0.25,
+        });
+    };
+
+    const handleMarkerClick = (vessel: ClusteredVessel, e: L.LeafletMouseEvent) => {
+        if (vessel.isCluster) {
+            if (e.originalEvent) L.DomEvent.stop(e.originalEvent);
+            handleClusterInteraction(vessel);
+            return;
+        }
+        suppressNextMapClickRef.current = true;
+        if (e.originalEvent) L.DomEvent.stop(e.originalEvent);
+        if (onVesselSelect) {
+            onVesselSelect(vessel);
+        }
+    };
+
     return (
         <>
             {isIdle && (
                 <div className="absolute top-20 right-4 z-1000 animate-in fade-in slide-in-from-right-4 duration-500">
-                    <div className="bg-zinc-950/90 border border-amber-500/50 backdrop-blur-md px-3 py-2 rounded-lg shadow-2xl flex items-center gap-3">
+                    <div className="bg-zinc-950/90 border border-amber-500/50 backdrop-blur-md px-3 py-2 shadow-2xl flex items-center gap-3">
                         <div className="flex flex-col text-right">
                             <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">
                                 Updates Paused
@@ -241,71 +338,98 @@ function FleetLayer({
                         </div>
                         <button
                             onClick={recordActivity}
-                            className="bg-amber-500 hover:bg-amber-400 text-black text-[10px] font-bold px-2 py-1 rounded transition-colors active:scale-95"
+                            className="bg-amber-500 hover:bg-amber-400 text-black text-[10px] font-bold px-2 py-1 transition-colors active:scale-95"
                         >
                             Resume
                         </button>
                     </div>
                 </div>
             )}
+
             {visibleVessels.map((vessel) => (
                 <Marker
-                    key={`${vessel.mmsi}-${vessel.isCluster}`}
+                    key={vessel.mmsi}
                     position={[vessel.lat, vessel.lng]}
-                    icon={createVesselIcon(vessel.course || 0, vessel.isCluster)}
+                    interactive={true}
+                    bubblingMouseEvents={false}
+                    riseOnHover={true}
+                    icon={createVesselIcon(
+                        vessel.course || 0,
+                        vessel.isCluster,
+                        vessel.mmsi === selectedMmsi
+                    )}
+                    eventHandlers={{
+                        mousedown: (e) => handleMarkerClick(vessel, e),
+                        click: (e) => handleMarkerClick(vessel, e),
+                    }}
                 >
-                    <Popup className="vessel-popup">
-                        <div className="bg-zinc-950 text-white p-1 min-w-[200px]">
-                            <div className="border-b border-white/10 pb-2 mb-2 flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <FaShip className="text-zinc-400" />
-                                    <span className="font-bold text-xs uppercase tracking-wider">
-                                        {vessel.isCluster
-                                            ? 'Multiple Vessels'
-                                            : vessel.name || 'Unknown'}
-                                    </span>
-                                </div>
-                                {vessel.isCluster && (
-                                    <span className="bg-white/10 px-1.5 py-0.5 text-[9px] font-black rounded">
-                                        {vessel.clusterCount}
-                                    </span>
-                                )}
-                            </div>
-
-                            {!vessel.isCluster ? (
-                                <div className="grid grid-cols-2 gap-y-2 text-[10px]">
-                                    <div className="text-zinc-500 uppercase font-bold">Type</div>
-                                    <div>{vessel.vessel_type_text || 'Unknown'}</div>
-
-                                    <div className="text-zinc-500 uppercase font-bold flex items-center gap-1">
-                                        <FaGaugeHigh /> Speed
+                    {windowVessels.length < 0 && (
+                        <Popup className="vessel-popup" closeButton={false}>
+                            <div className="bg-zinc-950 text-white p-1 min-w-[220px]">
+                                <div className="border-b border-white/10 pb-2 mb-2 pr-8 flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <FaShip className="text-zinc-400" />
+                                        <span className="font-bold text-xs uppercase tracking-wider">
+                                            {vessel.isCluster
+                                                ? 'Multiple Vessels'
+                                                : vessel.name || 'Unknown'}
+                                        </span>
                                     </div>
-                                    <div>{vessel.speed?.toFixed(1) || '0.0'} kn</div>
-
-                                    <div className="text-zinc-500 uppercase font-bold flex items-center gap-1">
-                                        <FaCompass /> Course
-                                    </div>
-                                    <div>{vessel.course || '0'}°</div>
-
-                                    <div className="text-zinc-500 uppercase font-bold">MMSI</div>
-                                    <div className="font-mono">{vessel.mmsi}</div>
-
-                                    {vessel.destination && (
-                                        <>
-                                            <div className="text-zinc-500 uppercase font-bold">
-                                                Dest
-                                            </div>
-                                            <div className="truncate">{vessel.destination}</div>
-                                        </>
+                                    {vessel.isCluster && (
+                                        <span className="bg-white/10 px-1.5 py-0.5 text-[9px] font-black">
+                                            {vessel.clusterCount}
+                                        </span>
                                     )}
                                 </div>
-                            ) : (
-                                <div className="text-[10px] text-zinc-400 italic py-1">
-                                    Zoom in to separate individual vessels.
-                                </div>
-                            )}
-                        </div>
-                    </Popup>
+
+                                {!vessel.isCluster ? (
+                                    <div className="grid grid-cols-2 gap-y-2 text-[10px]">
+                                        <div className="text-zinc-500 uppercase font-bold">
+                                            Type
+                                        </div>
+                                        <div>{vessel.vessel_type_text || 'Unknown'}</div>
+
+                                        <div className="text-zinc-500 uppercase font-bold flex items-center gap-1">
+                                            <FaGaugeHigh /> Speed
+                                        </div>
+                                        <div>{vessel.speed?.toFixed(1) || '0.0'} kn</div>
+
+                                        <div className="text-zinc-500 uppercase font-bold flex items-center gap-1">
+                                            <FaCompass /> Course
+                                        </div>
+                                        <div>{vessel.course || '0'}°</div>
+
+                                        <div className="text-zinc-500 uppercase font-bold">
+                                            MMSI
+                                        </div>
+                                        <div className="font-mono">{vessel.mmsi}</div>
+
+                                        <div className="text-zinc-500 uppercase font-bold">IMO</div>
+                                        <div className="font-mono">{vessel.imo || 'Unknown'}</div>
+
+                                        {vessel.destination && (
+                                            <>
+                                                <div className="text-zinc-500 uppercase font-bold">
+                                                    Dest
+                                                </div>
+                                                <div className="truncate">{vessel.destination}</div>
+                                            </>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="border border-white/20 bg-zinc-900/60 px-2 py-2">
+                                        <div className="flex items-center gap-2 text-cyan-300 text-[10px] font-bold uppercase tracking-wider">
+                                            <FaCircleInfo />
+                                            Multiple vessels grouped
+                                        </div>
+                                        <div className="text-[10px] text-zinc-300 mt-1">
+                                            Zoom in to separate and select an individual vessel.
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </Popup>
+                    )}
                 </Marker>
             ))}
         </>
@@ -390,8 +514,8 @@ function PortLayer() {
                     icon={portIcon}
                 >
                     <Popup className="vessel-popup">
-                        <div className="bg-zinc-950 text-white p-1 min-w-[150px]">
-                            <div className="border-b border-white/10 pb-1 mb-1">
+                        <div className="bg-zinc-950 text-white p-1 min-w-[180px]">
+                            <div className="border-b border-white/10 pb-1 mb-1 pr-8">
                                 <span className="font-bold text-xs uppercase tracking-wider text-cyan-400">
                                     {port.properties.Name}
                                 </span>
@@ -455,9 +579,19 @@ interface MapDisplayProps {
         trackedShips: number;
         trackedVessels: Vessel[];
     }) => void;
+    selectedMmsi: number | null;
+    onVesselSelect?: (vessel: Vessel | null) => void;
+    onClusterZoomNotice?: () => void;
 }
 
-export default function MapDisplay({ center = [20, 0], zoom = 3, onFleetUpdate }: MapDisplayProps) {
+export default function MapDisplay({
+    center = [20, 0],
+    zoom = 3,
+    onFleetUpdate,
+    selectedMmsi,
+    onVesselSelect,
+    onClusterZoomNotice,
+}: MapDisplayProps) {
     return (
         <div className="fixed inset-0 z-0 bg-zinc-950">
             <MapContainer
@@ -475,8 +609,13 @@ export default function MapDisplay({ center = [20, 0], zoom = 3, onFleetUpdate }
                     url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
                 />
 
-                <FleetLayer onUpdate={onFleetUpdate} />
                 <PortLayer />
+                <FleetLayer
+                    onUpdate={onFleetUpdate}
+                    selectedMmsi={selectedMmsi}
+                    onVesselSelect={onVesselSelect}
+                    onClusterZoomNotice={onClusterZoomNotice}
+                />
                 <MapViewHandler center={center} zoom={zoom} />
                 <ZoomControls />
             </MapContainer>

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { Head } from '@inertiajs/react';
 import MainLayout from '../Layouts/MainLayout';
 import HeaderBar from '../Components/HeaderBar';
@@ -24,6 +24,9 @@ export default function Index() {
     });
 
     const [trackedVessels, setTrackedVessels] = useState<Vessel[]>([]);
+    const [selectedVessel, setSelectedVessel] = useState<Vessel | null>(null);
+    const [showClusterZoomNotice, setShowClusterZoomNotice] = useState(false);
+    const clusterZoomNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const handleNavigate = useCallback((lat: number, lon: number, zoom: number = 12) => {
         setMapViewState({ center: [lat, lon], zoom });
@@ -38,9 +41,35 @@ export default function Index() {
         setTrackedVessels(stats.trackedVessels || []);
     }, []);
 
+    const handleSelectVessel = useCallback((vessel: Vessel | null) => {
+        setSelectedVessel(vessel);
+    }, []);
+
+    const handleClusterZoomNotice = useCallback(() => {
+        setShowClusterZoomNotice(true);
+        if (clusterZoomNoticeTimerRef.current) {
+            clearTimeout(clusterZoomNoticeTimerRef.current);
+        }
+        clusterZoomNoticeTimerRef.current = setTimeout(() => {
+            setShowClusterZoomNotice(false);
+        }, 1800);
+    }, []);
+
     return (
         <MainLayout
-            header={<HeaderBar onNavigate={handleNavigate} vessels={trackedVessels} />}
+            header={
+                <HeaderBar
+                    onNavigate={handleNavigate}
+                    vessels={trackedVessels}
+                    onSelectVessel={handleSelectVessel}
+                    selectedVesselName={
+                        selectedVessel
+                            ? selectedVessel.name?.trim() || `MMSI ${selectedVessel.mmsi}`
+                            : undefined
+                    }
+                    showClusterZoomNotice={showClusterZoomNotice}
+                />
+            }
             fleetStats={fleetStats}
         >
             <Head title="Home" />
@@ -48,6 +77,9 @@ export default function Index() {
                 center={mapViewState.center}
                 zoom={mapViewState.zoom}
                 onFleetUpdate={handleFleetUpdate}
+                selectedMmsi={selectedVessel?.mmsi ?? null}
+                onVesselSelect={handleSelectVessel}
+                onClusterZoomNotice={handleClusterZoomNotice}
             />
         </MainLayout>
     );

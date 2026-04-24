@@ -167,8 +167,11 @@ export default function StatusBar({
                 </div>
             </div>
 
-            {showDetails && (
-                <div className="fixed inset-0 z-99" onClick={() => setShowDetails(false)} />
+            {showDetails && systemStatus && (
+                <div
+                    className="fixed inset-0 z-99 bg-transparent"
+                    onClick={() => setShowDetails(false)}
+                />
             )}
         </>
     );
