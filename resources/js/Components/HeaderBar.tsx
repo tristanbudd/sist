@@ -1,7 +1,25 @@
 import { useState, useMemo } from 'react';
 import { FaSearch, FaShip, FaAnchor } from 'react-icons/fa';
 
-const SAMPLE_VESSELS = [
+interface Vessel {
+    category: 'vessel';
+    name: string;
+    mmsi: string;
+    imo: string;
+    type: string;
+}
+
+interface Port {
+    category: 'port';
+    name: string;
+    code: string;
+    country: string;
+    type: string;
+}
+
+type SearchItem = Vessel | Port;
+
+const SAMPLE_VESSELS: Vessel[] = [
     {
         name: 'OCEAN EXPLORER',
         mmsi: '235114700',
@@ -36,7 +54,7 @@ const SAMPLE_VESSELS = [
     },
 ];
 
-const SAMPLE_PORTS = [
+const SAMPLE_PORTS: Port[] = [
     {
         name: 'PORT OF SINGAPORE',
         code: 'SGSIN',
@@ -61,16 +79,20 @@ const SAMPLE_PORTS = [
     },
 ];
 
-const ALL_RESULTS = [...SAMPLE_VESSELS, ...SAMPLE_PORTS];
+const ALL_RESULTS: SearchItem[] = [...SAMPLE_VESSELS, ...SAMPLE_PORTS];
 
+/**
+ * Handles multi-format coordinate parsing (DD, Hemisphere-DD, and DMS)
+ * Standardizes all inputs into decimal degree objects.
+ */
 const parseVesselCoords = (input: string): { lat: number; lon: number } | null => {
     const q = input.trim();
 
-    // Standard DD: 51.5074, -0.1278
+    // Standard Decimal Degrees (e.g. 51.5074, -0.1278)
     const stdDD = q.match(/^([-+]?\d{1,2}(?:\.\d+)?),\s*([-+]?\d{1,3}(?:\.\d+)?)$/);
     if (stdDD) return { lat: parseFloat(stdDD[1]), lon: parseFloat(stdDD[2]) };
 
-    // DD with Hemispheres: 37.401573° N, 116.867808° W
+    // Decimal Degrees with Hemispheres (e.g. 37.4° N, 116.8° W)
     const hemiDD = q.match(/^(\d+(?:\.\d+)?)°?\s*([NSns]),?\s*(\d+(?:\.\d+)?)°?\s*([EWew])$/);
     if (hemiDD) {
         let lat = parseFloat(hemiDD[1]);
@@ -80,20 +102,23 @@ const parseVesselCoords = (input: string): { lat: number; lon: number } | null =
         return { lat, lon };
     }
 
-    // DMS: 12° 22′ 13.32″ N, 23° 19′ 20.18″ E
-    // Regex allows optional degree, minute, second symbols and various quote marks
+    // Degrees Minutes Seconds (e.g. 12° 22′ 13″ N, 23° 19′ 20″ E)
     const dms = q.match(
         /^(\d+)°?\s*(\d+)[′']?\s*(\d+(?:\.\d+)?)[″"]?\s*([NSns]),?\s*(\d+)°?\s*(\d+)[′']?\s*(\d+(?:\.\d+)?)[″"]?\s*([EWew])$/
     );
     if (dms) {
-        const d1 = parseFloat(dms[1]),
-            m1 = parseFloat(dms[2]),
-            s1 = parseFloat(dms[3]),
-            h1 = dms[4].toUpperCase();
-        const d2 = parseFloat(dms[5]),
-            m2 = parseFloat(dms[6]),
-            s2 = parseFloat(dms[7]),
-            h2 = dms[8].toUpperCase();
+        const [d1, m1, s1, h1] = [
+            parseFloat(dms[1]),
+            parseFloat(dms[2]),
+            parseFloat(dms[3]),
+            dms[4].toUpperCase(),
+        ];
+        const [d2, m2, s2, h2] = [
+            parseFloat(dms[5]),
+            parseFloat(dms[6]),
+            parseFloat(dms[7]),
+            dms[8].toUpperCase(),
+        ];
 
         let lat = d1 + m1 / 60 + s1 / 3600;
         let lon = d2 + m2 / 60 + s2 / 3600;
@@ -119,31 +144,23 @@ export default function HeaderBar() {
 
         return ALL_RESULTS.filter((item) => {
             if (item.category === 'vessel') {
-                return (
-                    item.name.includes(q) ||
-                    (item as any).mmsi.includes(q) ||
-                    (item as any).imo.includes(q)
-                );
+                return item.name.includes(q) || item.mmsi.includes(q) || item.imo.includes(q);
             }
             return (
                 item.name.includes(q) ||
-                (item as any).code.includes(q) ||
-                (item as any).country.toUpperCase().includes(q)
+                item.code.includes(q) ||
+                item.country.toUpperCase().includes(q)
             );
         });
     }, [query]);
 
-    const displayedSuggestions = useMemo(() => {
-        return suggestions.slice(0, limit);
-    }, [suggestions, limit]);
+    const displayedSuggestions = useMemo(() => suggestions.slice(0, limit), [suggestions, limit]);
 
-    const handleSelect = (item: (typeof ALL_RESULTS)[0]) => {
+    const handleSelect = (item: SearchItem) => {
         if (item.category === 'vessel') {
-            console.log(`MONITORING VESSEL: ${item.name} (MMSI: ${(item as any).mmsi})`);
+            console.info(`MONITORING VESSEL: ${item.name} (MMSI: ${item.mmsi})`);
         } else {
-            console.log(
-                `ARRIVING AT PORT: ${item.name} (${(item as any).code}, ${(item as any).country})`
-            );
+            console.info(`ARRIVING AT PORT: ${item.name} (${item.code}, ${item.country})`);
         }
         setQuery(item.name);
         setShowSuggestions(false);
@@ -154,9 +171,8 @@ export default function HeaderBar() {
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter') {
             const q = query.trim();
-
-            // 1. Check for coordinates
             const coords = parseVesselCoords(q);
+
             if (coords) {
                 const { lat, lon } = coords;
                 if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
@@ -165,23 +181,18 @@ export default function HeaderBar() {
                     );
                     return;
                 }
-                console.log(`NAVIGATING TO COORDINATES: [${lat.toFixed(6)}, ${lon.toFixed(6)}]`);
+                console.info(`NAVIGATING TO COORDINATES: [${lat.toFixed(6)}, ${lon.toFixed(6)}]`);
                 setError(null);
                 setShowSuggestions(false);
                 return;
             }
 
-            // 2. Check for exact matches
             const upperQ = q.toUpperCase();
             const exactMatch = ALL_RESULTS.find((item) => {
                 if (item.category === 'vessel') {
-                    return (
-                        item.name === upperQ ||
-                        (item as any).mmsi === upperQ ||
-                        (item as any).imo === upperQ
-                    );
+                    return item.name === upperQ || item.mmsi === upperQ || item.imo === upperQ;
                 }
-                return item.name === upperQ || (item as any).code === upperQ;
+                return item.name === upperQ || item.code === upperQ;
             });
 
             if (exactMatch) {
@@ -194,7 +205,7 @@ export default function HeaderBar() {
 
     return (
         <header className="fixed top-0 left-0 right-0 z-50 p-4 flex items-start justify-between pointer-events-none">
-            {/* Click-off Overlay */}
+            {/* Background overlay to handle click-off dismissals */}
             {showSuggestions && (
                 <div
                     className="fixed inset-0 pointer-events-auto z-0"
@@ -202,8 +213,7 @@ export default function HeaderBar() {
                 />
             )}
 
-            {/* Logo Block */}
-            <div className="relative flex items-center gap-3 bg-zinc-950 border border-white/20 rounded-none px-4 py-3 shadow-2xl pointer-events-auto z-10">
+            <div className="relative flex items-center gap-3 bg-zinc-950 border border-white/20 px-4 py-3 shadow-2xl pointer-events-auto z-10">
                 <img src="/images/logo.png" alt="SIST Logo" className="h-7 w-auto" />
                 <div className="flex flex-col justify-center leading-none">
                     <span className="text-white text-sm font-bold tracking-wider">SIST</span>
@@ -213,9 +223,8 @@ export default function HeaderBar() {
                 </div>
             </div>
 
-            {/* Search Bar Block */}
             <div className="absolute left-1/2 -translate-x-1/2 w-full max-w-[400px] pointer-events-auto z-10">
-                <div className="relative flex items-center gap-3 bg-zinc-950 border border-white/20 rounded-none px-4 py-3 shadow-2xl transition-all focus-within:border-white/40 focus-within:ring-1 focus-within:ring-white/10">
+                <div className="relative flex items-center gap-3 bg-zinc-950 border border-white/20 px-4 py-3 shadow-2xl transition-all focus-within:border-white/40 focus-within:ring-1 focus-within:ring-white/10">
                     <FaSearch
                         className={`w-4 h-4 transition-colors ${query ? 'text-white' : 'text-zinc-500'}`}
                     />
@@ -235,18 +244,16 @@ export default function HeaderBar() {
                     />
                 </div>
 
-                {/* Error Message */}
                 {error && (
-                    <div className="absolute top-full left-0 right-0 bg-red-500/10 border border-red-500/50 rounded-none px-4 py-2 mt-[1px] shadow-2xl">
+                    <div className="absolute top-full left-0 right-0 bg-red-500/10 border border-red-500/50 px-4 py-2 mt-px shadow-2xl">
                         <span className="text-[10px] text-red-400 font-bold uppercase tracking-wider">
                             {error}
                         </span>
                     </div>
                 )}
 
-                {/* Suggestions Dropdown */}
                 {showSuggestions && !error && suggestions.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 bg-zinc-950 border-x border-b border-white/20 shadow-2xl mt-[1px] max-h-[400px] overflow-y-auto">
+                    <div className="absolute top-full left-0 right-0 bg-zinc-950 border-x border-b border-white/20 shadow-2xl mt-px max-h-[400px] overflow-y-auto">
                         {!query.trim() && (
                             <div className="px-4 py-2 border-b border-white/5">
                                 <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-[0.2em]">
@@ -256,11 +263,7 @@ export default function HeaderBar() {
                         )}
                         {displayedSuggestions.map((item) => (
                             <button
-                                key={
-                                    item.category === 'vessel'
-                                        ? (item as any).mmsi
-                                        : (item as any).code
-                                }
+                                key={item.category === 'vessel' ? item.mmsi : item.code}
                                 onClick={() => handleSelect(item)}
                                 className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-none text-left"
                             >
@@ -276,8 +279,8 @@ export default function HeaderBar() {
                                         </span>
                                         <span className="text-zinc-500 text-[9px] font-mono">
                                             {item.category === 'vessel'
-                                                ? `MMSI: ${(item as any).mmsi} | IMO: ${(item as any).imo}`
-                                                : `CODE: ${(item as any).code} | ${(item as any).country}`}
+                                                ? `MMSI: ${item.mmsi} | IMO: ${item.imo}`
+                                                : `CODE: ${item.code} | ${item.country}`}
                                         </span>
                                     </div>
                                 </div>
@@ -287,8 +290,7 @@ export default function HeaderBar() {
                             </button>
                         ))}
 
-                        {/* Search Footer */}
-                        <div className="flex items-center justify-between px-4 py-2 bg-white/[0.02] border-t border-white/5">
+                        <div className="flex items-center justify-between px-4 py-2 bg-white/2 border-t border-white/5">
                             <span className="text-[9px] text-zinc-500 font-medium">
                                 Showing {displayedSuggestions.length} of {suggestions.length} found
                             </span>
@@ -308,8 +310,6 @@ export default function HeaderBar() {
                     </div>
                 )}
             </div>
-
-            {/* Right side spacer */}
             <div className="w-16 hidden md:block" />
         </header>
     );
