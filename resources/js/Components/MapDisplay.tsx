@@ -19,7 +19,7 @@ const MAX_BOUNDS: L.LatLngBoundsExpression = [
     [90, 180],
 ];
 
-interface Vessel {
+export interface Vessel {
     mmsi: number;
     imo?: number;
     name: string;
@@ -44,11 +44,13 @@ function FleetLayer({
         renderedIcons: number;
         totalRenderedShips: number;
         trackedShips: number;
+        trackedVessels: Vessel[];
     }) => void;
 }) {
     const map = useMap();
     const [vessels, setVessels] = useState<Vessel[]>([]);
     const [trackedCount, setTrackedCount] = useState(0);
+    const [trackedVessels, setTrackedVessels] = useState<Vessel[]>([]);
     const [zoom, setZoom] = useState(map.getZoom());
     const fetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -111,6 +113,7 @@ function FleetLayer({
             });
             const data = response.data.data || [];
             setTrackedCount(data.length);
+            setTrackedVessels(data);
         } catch (error) {
             console.error('Failed to fetch global fleet count:', error);
         }
@@ -197,9 +200,10 @@ function FleetLayer({
                 renderedIcons: visibleVessels.length,
                 totalRenderedShips,
                 trackedShips: Math.max(trackedCount, totalRenderedShips),
+                trackedVessels,
             });
         }
-    }, [visibleVessels, trackedCount, onUpdate]);
+    }, [visibleVessels, trackedCount, trackedVessels, onUpdate]);
 
     const createVesselIcon = (course: number, isCluster: boolean) => {
         const singleArrow = `
@@ -308,6 +312,23 @@ function FleetLayer({
     );
 }
 
+interface PortFeature {
+    type: string;
+    properties: {
+        Country: string;
+        Function: string;
+        LOCODE: string;
+        Name: string;
+        NameWoDiac: string;
+        Status: string;
+        outflows: number;
+    };
+    geometry: {
+        type: string;
+        coordinates: [number, number];
+    };
+}
+
 function PortLayer() {
     const map = useMap();
     const [zoom, setZoom] = useState(map.getZoom());
@@ -319,12 +340,13 @@ function PortLayer() {
     const visiblePorts = useMemo(() => {
         if (zoom < 6) return [];
 
-        const filtered: any[] = [];
+        const portsDataTyped = portsData as unknown as { features: PortFeature[] };
+        const filtered: PortFeature[] = [];
         const minDistancePx = zoom < 7 ? 25 : zoom < 10 ? 15 : 0;
 
-        if (minDistancePx === 0) return portsData.features;
+        if (minDistancePx === 0) return portsDataTyped.features;
 
-        portsData.features.forEach((port: any) => {
+        portsDataTyped.features.forEach((port) => {
             const pos = map.latLngToLayerPoint([
                 port.geometry.coordinates[1],
                 port.geometry.coordinates[0],
@@ -361,9 +383,9 @@ function PortLayer() {
 
     return (
         <>
-            {visiblePorts.map((port: any) => (
+            {visiblePorts.map((port: PortFeature, idx: number) => (
                 <Marker
-                    key={port.properties.LOCODE}
+                    key={`port-${port.properties.LOCODE}-${idx}`}
                     position={[port.geometry.coordinates[1], port.geometry.coordinates[0]]}
                     icon={portIcon}
                 >
@@ -431,6 +453,7 @@ interface MapDisplayProps {
         renderedIcons: number;
         totalRenderedShips: number;
         trackedShips: number;
+        trackedVessels: Vessel[];
     }) => void;
 }
 

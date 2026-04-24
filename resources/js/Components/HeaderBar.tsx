@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { FaSearch, FaShip, FaAnchor } from 'react-icons/fa';
 import portsGeoJson from '../../data/ports.json';
+import { Vessel as MapVessel } from './MapDisplay';
 
 interface Vessel {
     name: string;
@@ -29,76 +30,23 @@ interface Coordinates {
 
 interface HeaderBarProps {
     onNavigate?: (lat: number, lon: number, zoom: number) => void;
+    vessels?: MapVessel[];
 }
 
-const SAMPLE_VESSELS: Vessel[] = [
-    {
-        name: 'OCEAN EXPLORER',
-        mmsi: '235114700',
-        imo: '9153549',
-        category: 'vessel',
-        lat: 51.5074,
-        lon: -0.1278,
-    },
-    {
-        name: 'ARCTIC TERN',
-        mmsi: '231001000',
-        imo: '8901234',
-        category: 'vessel',
-        lat: 64.1265,
-        lon: -21.8174,
-    },
-    {
-        name: 'GLOBAL TRADER',
-        mmsi: '351123000',
-        imo: '9412345',
-        category: 'vessel',
-        lat: 1.2902,
-        lon: 103.8519,
-    },
-    {
-        name: 'PACIFIC STAR',
-        mmsi: '563001000',
-        imo: '9876543',
-        category: 'vessel',
-        lat: 34.0522,
-        lon: -118.2437,
-    },
-    {
-        name: 'NORTH SEA GIANT',
-        mmsi: '257545000',
-        imo: '9523964',
-        category: 'vessel',
-        lat: 58.969,
-        lon: 5.7331,
-    },
-    {
-        name: 'BLUE WHALE',
-        mmsi: '477312600',
-        imo: '9616759',
-        category: 'vessel',
-        lat: 22.3193,
-        lon: 114.1694,
-    },
-    {
-        name: 'EVER GIVEN',
-        mmsi: '353136000',
-        imo: '9811000',
-        category: 'vessel',
-        lat: 29.9745,
-        lon: 32.5418,
-    },
-    {
-        name: 'VIKING GRACE',
-        mmsi: '230629000',
-        imo: '9606900',
-        category: 'vessel',
-        lat: 60.4518,
-        lon: 22.2666,
-    },
-];
+interface PortFeature {
+    properties: {
+        Name: string;
+        LOCODE: string;
+        Country: string;
+    };
+    geometry: {
+        coordinates: [number, number];
+    };
+}
 
-const WORLD_PORTS: Port[] = portsGeoJson.features.map((feature) => ({
+const portsGeoJsonTyped = portsGeoJson as unknown as { features: PortFeature[] };
+
+const WORLD_PORTS: Port[] = portsGeoJsonTyped.features.map((feature: PortFeature) => ({
     category: 'port' as const,
     name: feature.properties.Name.toUpperCase(),
     code: feature.properties.LOCODE,
@@ -106,8 +54,6 @@ const WORLD_PORTS: Port[] = portsGeoJson.features.map((feature) => ({
     lat: feature.geometry.coordinates[1],
     lon: feature.geometry.coordinates[0],
 }));
-
-const ALL_RESULTS: SearchResult[] = [...SAMPLE_VESSELS, ...WORLD_PORTS];
 
 const parseVesselCoords = (input: string): Coordinates | null => {
     const q = input.trim();
@@ -153,16 +99,28 @@ const parseVesselCoords = (input: string): Coordinates | null => {
     return null;
 };
 
-export default function HeaderBar({ onNavigate }: HeaderBarProps) {
+export default function HeaderBar({ onNavigate, vessels = [] }: HeaderBarProps) {
     const [query, setQuery] = useState('');
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [limit, setLimit] = useState(5);
     const [error, setError] = useState<string | null>(null);
 
+    const allResults = useMemo(() => {
+        const liveVessels: Vessel[] = vessels.map((v) => ({
+            category: 'vessel' as const,
+            name: v.name || 'UNKNOWN',
+            mmsi: String(v.mmsi),
+            imo: String(v.imo || ''),
+            lat: v.lat,
+            lon: v.lng,
+        }));
+        return [...liveVessels, ...WORLD_PORTS];
+    }, [vessels]);
+
     const suggestions = useMemo(() => {
         const q = query.toUpperCase().trim();
 
-        const matches = ALL_RESULTS.filter((item: SearchResult) => {
+        const matches = allResults.filter((item: SearchResult) => {
             if (!q) return true;
             if (item.category === 'vessel') {
                 return (
@@ -184,11 +142,15 @@ export default function HeaderBar({ onNavigate }: HeaderBarProps) {
             }
             return a.name.localeCompare(b.name);
         });
-    }, [query]);
+    }, [query, allResults]);
 
     const displayedSuggestions = useMemo(() => suggestions.slice(0, limit), [suggestions, limit]);
 
     const handleSelect = (item: SearchResult) => {
+        if (item.category === 'vessel') {
+            console.info(`FLEET_INTEL: Vessel Search Selection [MMSI: ${item.mmsi}]`);
+        }
+
         if (onNavigate) {
             onNavigate(item.lat, item.lon, 14);
         }
@@ -221,7 +183,7 @@ export default function HeaderBar({ onNavigate }: HeaderBarProps) {
             }
 
             const upperQ = q.toUpperCase();
-            const exactMatch = ALL_RESULTS.find((item) => {
+            const exactMatch = allResults.find((item) => {
                 if (item.category === 'vessel') {
                     return item.name === upperQ || item.mmsi === upperQ || item.imo === upperQ;
                 }
@@ -303,9 +265,9 @@ export default function HeaderBar({ onNavigate }: HeaderBarProps) {
                         )}
                         {displayedSuggestions
                             .filter((i): i is Vessel => i.category === 'vessel')
-                            .map((item) => (
+                            .map((item, idx) => (
                                 <button
-                                    key={item.mmsi}
+                                    key={`vessel-${item.mmsi}-${idx}`}
                                     onClick={() => handleSelect(item)}
                                     className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-none text-left"
                                 >
@@ -334,9 +296,9 @@ export default function HeaderBar({ onNavigate }: HeaderBarProps) {
                         )}
                         {displayedSuggestions
                             .filter((i): i is Port => i.category === 'port')
-                            .map((item) => (
+                            .map((item, idx) => (
                                 <button
-                                    key={item.code}
+                                    key={`port-${item.code}-${idx}`}
                                     onClick={() => handleSelect(item)}
                                     className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-none text-left"
                                 >

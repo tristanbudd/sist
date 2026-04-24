@@ -1,8 +1,15 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Head } from '@inertiajs/react';
 import MainLayout from '../Layouts/MainLayout';
 import HeaderBar from '../Components/HeaderBar';
-import MapDisplay from '../Components/MapDisplay';
+import MapDisplay, { Vessel } from '../Components/MapDisplay';
+
+interface FleetStats {
+    renderedIcons: number;
+    totalRenderedShips: number;
+    trackedShips: number;
+    trackedVessels: Vessel[];
+}
 
 export default function Index() {
     const [mapViewState, setMapViewState] = useState<{ center: [number, number]; zoom: number }>({
@@ -16,17 +23,31 @@ export default function Index() {
         trackedShips: 0,
     });
 
-    const handleNavigate = (lat: number, lon: number, zoom: number = 12) => {
+    const [trackedVessels, setTrackedVessels] = useState<Vessel[]>([]);
+
+    const handleNavigate = useCallback((lat: number, lon: number, zoom: number = 12) => {
         setMapViewState({ center: [lat, lon], zoom });
-    };
+    }, []);
+
+    const handleFleetUpdate = useCallback((stats: FleetStats) => {
+        setFleetStats({
+            renderedIcons: stats.renderedIcons,
+            totalRenderedShips: stats.totalRenderedShips,
+            trackedShips: stats.trackedShips,
+        });
+        setTrackedVessels(stats.trackedVessels || []);
+    }, []);
 
     return (
-        <MainLayout header={<HeaderBar onNavigate={handleNavigate} />} fleetStats={fleetStats}>
+        <MainLayout
+            header={<HeaderBar onNavigate={handleNavigate} vessels={trackedVessels} />}
+            fleetStats={fleetStats}
+        >
             <Head title="Home" />
             <MapDisplay
                 center={mapViewState.center}
                 zoom={mapViewState.zoom}
-                onFleetUpdate={setFleetStats}
+                onFleetUpdate={handleFleetUpdate}
             />
         </MainLayout>
     );
