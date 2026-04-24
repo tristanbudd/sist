@@ -1,8 +1,9 @@
-import { useEffect } from 'react';
-import { MapContainer, TileLayer, useMap } from 'react-leaflet';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { MapContainer, TileLayer, useMap, Marker, Popup, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { FaPlus, FaMinus } from 'react-icons/fa6';
+import { FaPlus, FaMinus, FaShip, FaGaugeHigh, FaCompass } from 'react-icons/fa6';
 import L from 'leaflet';
+import axios from 'axios';
 
 // @ts-expect-error - Leaflet icon fix
 delete L.Icon.Default.prototype._getIconUrl;
@@ -17,9 +18,295 @@ const MAX_BOUNDS: L.LatLngBoundsExpression = [
     [90, 180],
 ];
 
-/**
- * Custom high-performance zoom controls with industrial aesthetic.
- */
+interface Vessel {
+    mmsi: number;
+    imo?: number;
+    name: string;
+    lat: number;
+    lng: number;
+    speed: number;
+    course: number;
+    vessel_type_text: string;
+    last_seen_at: string;
+    destination?: string;
+}
+
+interface ClusteredVessel extends Vessel {
+    isCluster: boolean;
+    clusterCount: number;
+}
+
+function FleetLayer({
+    onUpdate,
+}: {
+    onUpdate?: (stats: {
+        renderedIcons: number;
+        totalRenderedShips: number;
+        trackedShips: number;
+    }) => void;
+}) {
+    const map = useMap();
+    const [vessels, setVessels] = useState<Vessel[]>([]);
+    const [trackedCount, setTrackedCount] = useState(0);
+    const [zoom, setZoom] = useState(map.getZoom());
+    const fetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const trackedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const abortControllerRef = useRef<AbortController | null>(null);
+    const [lastActivity, setLastActivity] = useState(Date.now());
+    const [isIdle, setIsIdle] = useState(false);
+    const IDLE_THRESHOLD = 120000;
+
+    const recordActivity = useCallback(() => {
+        setLastActivity(Date.now());
+        if (isIdle) setIsIdle(false);
+    }, [isIdle]);
+
+    const fetchVessels = useCallback(
+        async (force = false) => {
+            if (isIdle && !force) return;
+
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+
+            const controller = new AbortController();
+            abortControllerRef.current = controller;
+
+            const bounds = map.getBounds();
+            const currentZoom = map.getZoom();
+            setZoom(currentZoom);
+
+            try {
+                const response = await axios.get('https://sist.tristanbudd.com/api/vessels', {
+                    signal: controller.signal,
+                    params: {
+                        sw_lat: bounds.getSouthWest().lat,
+                        sw_lng: bounds.getSouthWest().lng,
+                        ne_lat: bounds.getNorthEast().lat,
+                        ne_lng: bounds.getNorthEast().lng,
+                        age_minutes: 60,
+                    },
+                });
+                setVessels(response.data.data || []);
+            } catch (error) {
+                if (axios.isCancel(error)) return;
+                console.error('Failed to fetch fleet data:', error);
+                setVessels([]);
+            } finally {
+                if (abortControllerRef.current === controller) {
+                    abortControllerRef.current = null;
+                }
+            }
+        },
+        [map, isIdle]
+    );
+
+    const fetchTrackedCount = useCallback(async () => {
+        if (isIdle) return;
+        try {
+            const response = await axios.get('https://sist.tristanbudd.com/api/vessels', {
+                params: { age_minutes: 60 },
+            });
+            const data = response.data.data || [];
+            setTrackedCount(data.length);
+        } catch (error) {
+            console.error('Failed to fetch global fleet count:', error);
+        }
+    }, [isIdle]);
+
+    const debouncedFetch = useCallback(() => {
+        if (fetchTimer.current) {
+            clearTimeout(fetchTimer.current);
+        }
+        fetchTimer.current = setTimeout(() => {
+            fetchVessels();
+        }, 400);
+    }, [fetchVessels]);
+
+    useMapEvents({
+        moveend: () => {
+            recordActivity();
+            debouncedFetch();
+        },
+        zoomend: () => {
+            recordActivity();
+            debouncedFetch();
+        },
+        click: recordActivity,
+        dragstart: recordActivity,
+        mousedown: recordActivity,
+    });
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (Date.now() - lastActivity > IDLE_THRESHOLD) {
+                setIsIdle(true);
+            }
+        }, 10000);
+        return () => clearInterval(interval);
+    }, [lastActivity]);
+
+    useEffect(() => {
+        fetchVessels(true);
+        fetchTrackedCount();
+
+        pollTimer.current = setInterval(() => fetchVessels(), 15000);
+        trackedTimer.current = setInterval(() => fetchTrackedCount(), 300000);
+
+        return () => {
+            if (fetchTimer.current) clearTimeout(fetchTimer.current);
+            if (pollTimer.current) clearInterval(pollTimer.current);
+            if (trackedTimer.current) clearInterval(trackedTimer.current);
+            if (abortControllerRef.current) abortControllerRef.current.abort();
+        };
+    }, [fetchVessels, fetchTrackedCount]);
+
+    const visibleVessels = useMemo(() => {
+        const filtered: ClusteredVessel[] = [];
+        const minDistancePx = zoom < 6 ? 10 : zoom < 11 ? 6 : 0;
+
+        if (minDistancePx === 0) {
+            return vessels.map((v) => ({ ...v, isCluster: false, clusterCount: 1 }));
+        }
+
+        vessels.forEach((vessel) => {
+            const pos = map.latLngToLayerPoint([vessel.lat, vessel.lng]);
+            const clusterIndex = filtered.findIndex((f) => {
+                const fPos = map.latLngToLayerPoint([f.lat, f.lng]);
+                const dist = Math.sqrt(Math.pow(pos.x - fPos.x, 2) + Math.pow(pos.y - fPos.y, 2));
+                return dist < minDistancePx;
+            });
+
+            if (clusterIndex !== -1) {
+                filtered[clusterIndex].isCluster = true;
+                filtered[clusterIndex].clusterCount++;
+            } else {
+                filtered.push({ ...vessel, isCluster: false, clusterCount: 1 });
+            }
+        });
+
+        return filtered;
+    }, [vessels, map, zoom]);
+
+    useEffect(() => {
+        if (onUpdate) {
+            const totalRenderedShips = visibleVessels.reduce((acc, v) => acc + v.clusterCount, 0);
+            onUpdate({
+                renderedIcons: visibleVessels.length,
+                totalRenderedShips,
+                trackedShips: Math.max(trackedCount, totalRenderedShips),
+            });
+        }
+    }, [visibleVessels, trackedCount, onUpdate]);
+
+    const createVesselIcon = (course: number, isCluster: boolean) => {
+        const singleArrow = `
+            <path d="M12 2L4.5 20.29L5.21 21L12 18L18.79 21L19.5 20.29L12 2Z" />
+        `;
+        const doubleArrow = `
+            <path d="M12 2L4.5 20.29L5.21 21L12 18L18.79 21L19.5 20.29L12 2Z" />
+            <path d="M12 8L7 20L12 18L17 20L12 8Z" opacity="0.6" />
+        `;
+
+        return L.divIcon({
+            className: 'vessel-icon-container',
+            html: `
+                <div style="transform: rotate(${course}deg); display: flex; align-items: center; justify-content: center;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="white" stroke="black" stroke-width="1">
+                        ${isCluster ? doubleArrow : singleArrow}
+                    </svg>
+                </div>
+            `,
+            iconSize: [18, 18],
+            iconAnchor: [9, 9],
+        });
+    };
+
+    return (
+        <>
+            {isIdle && (
+                <div className="absolute top-20 right-4 z-1000 animate-in fade-in slide-in-from-right-4 duration-500">
+                    <div className="bg-zinc-950/90 border border-amber-500/50 backdrop-blur-md px-3 py-2 rounded-lg shadow-2xl flex items-center gap-3">
+                        <div className="flex flex-col text-right">
+                            <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">
+                                Updates Paused
+                            </span>
+                            <span className="text-[9px] text-zinc-500">Inactive for 2 minutes</span>
+                        </div>
+                        <button
+                            onClick={recordActivity}
+                            className="bg-amber-500 hover:bg-amber-400 text-black text-[10px] font-bold px-2 py-1 rounded transition-colors active:scale-95"
+                        >
+                            Resume
+                        </button>
+                    </div>
+                </div>
+            )}
+            {visibleVessels.map((vessel) => (
+                <Marker
+                    key={`${vessel.mmsi}-${vessel.isCluster}`}
+                    position={[vessel.lat, vessel.lng]}
+                    icon={createVesselIcon(vessel.course || 0, vessel.isCluster)}
+                >
+                    <Popup className="vessel-popup">
+                        <div className="bg-zinc-950 text-white p-1 min-w-[200px]">
+                            <div className="border-b border-white/10 pb-2 mb-2 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <FaShip className="text-zinc-400" />
+                                    <span className="font-bold text-xs uppercase tracking-wider">
+                                        {vessel.isCluster
+                                            ? 'Multiple Vessels'
+                                            : vessel.name || 'Unknown'}
+                                    </span>
+                                </div>
+                                {vessel.isCluster && (
+                                    <span className="bg-white/10 px-1.5 py-0.5 text-[9px] font-black rounded">
+                                        {vessel.clusterCount}
+                                    </span>
+                                )}
+                            </div>
+
+                            {!vessel.isCluster ? (
+                                <div className="grid grid-cols-2 gap-y-2 text-[10px]">
+                                    <div className="text-zinc-500 uppercase font-bold">Type</div>
+                                    <div>{vessel.vessel_type_text || 'Unknown'}</div>
+
+                                    <div className="text-zinc-500 uppercase font-bold flex items-center gap-1">
+                                        <FaGaugeHigh /> Speed
+                                    </div>
+                                    <div>{vessel.speed?.toFixed(1) || '0.0'} kn</div>
+
+                                    <div className="text-zinc-500 uppercase font-bold flex items-center gap-1">
+                                        <FaCompass /> Course
+                                    </div>
+                                    <div>{vessel.course || '0'}°</div>
+
+                                    <div className="text-zinc-500 uppercase font-bold">MMSI</div>
+                                    <div className="font-mono">{vessel.mmsi}</div>
+
+                                    {vessel.destination && (
+                                        <>
+                                            <div className="text-zinc-500 uppercase font-bold">
+                                                Dest
+                                            </div>
+                                            <div className="truncate">{vessel.destination}</div>
+                                        </>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="text-[10px] text-zinc-400 italic py-1">
+                                    Zoom in to separate individual vessels.
+                                </div>
+                            )}
+                        </div>
+                    </Popup>
+                </Marker>
+            ))}
+        </>
+    );
+}
+
 function ZoomControls() {
     const map = useMap();
 
@@ -43,10 +330,6 @@ function ZoomControls() {
     );
 }
 
-/**
- * Component to handle programmatic map movements (flyTo).
- * React-Leaflet MapContainer center/zoom props are only for initialization.
- */
 function MapViewHandler({ center, zoom }: { center: [number, number]; zoom: number }) {
     const map = useMap();
 
@@ -63,9 +346,14 @@ function MapViewHandler({ center, zoom }: { center: [number, number]; zoom: numb
 interface MapDisplayProps {
     center?: [number, number];
     zoom?: number;
+    onFleetUpdate?: (stats: {
+        renderedIcons: number;
+        totalRenderedShips: number;
+        trackedShips: number;
+    }) => void;
 }
 
-export default function MapDisplay({ center = [20, 0], zoom = 3 }: MapDisplayProps) {
+export default function MapDisplay({ center = [20, 0], zoom = 3, onFleetUpdate }: MapDisplayProps) {
     return (
         <div className="fixed inset-0 z-0 bg-zinc-950">
             <MapContainer
@@ -83,6 +371,7 @@ export default function MapDisplay({ center = [20, 0], zoom = 3 }: MapDisplayPro
                     url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
                 />
 
+                <FleetLayer onUpdate={onFleetUpdate} />
                 <MapViewHandler center={center} zoom={zoom} />
                 <ZoomControls />
             </MapContainer>

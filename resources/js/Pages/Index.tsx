@@ -10,14 +10,24 @@ export default function Index() {
         zoom: 3,
     });
 
+    const [fleetStats, setFleetStats] = useState({
+        renderedIcons: 0,
+        totalRenderedShips: 0,
+        trackedShips: 0,
+    });
+
     const handleNavigate = (lat: number, lon: number, zoom: number = 12) => {
         setMapViewState({ center: [lat, lon], zoom });
     };
 
     return (
-        <MainLayout header={<HeaderBar onNavigate={handleNavigate} />}>
+        <MainLayout header={<HeaderBar onNavigate={handleNavigate} />} fleetStats={fleetStats}>
             <Head title="Home" />
-            <MapDisplay center={mapViewState.center} zoom={mapViewState.zoom} />
+            <MapDisplay
+                center={mapViewState.center}
+                zoom={mapViewState.zoom}
+                onFleetUpdate={setFleetStats}
+            />
         </MainLayout>
     );
 }

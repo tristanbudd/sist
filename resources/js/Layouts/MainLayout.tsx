@@ -6,7 +6,15 @@ import { FaDisplay } from 'react-icons/fa6';
 export default function MainLayout({
     children,
     header,
-}: PropsWithChildren<{ header?: React.ReactNode }>) {
+    fleetStats,
+}: PropsWithChildren<{
+    header?: React.ReactNode;
+    fleetStats?: {
+        renderedIcons: number;
+        totalRenderedShips: number;
+        trackedShips: number;
+    };
+}>) {
     return (
         <>
             {/* Unsupported screen notice - shown below 350px */}
@@ -28,7 +36,11 @@ export default function MainLayout({
             <div className="max-[349px]:hidden min-h-screen bg-zinc-950">
                 {header || <HeaderBar />}
                 {children}
-                <StatusBar />
+                <StatusBar
+                    renderedIcons={fleetStats?.renderedIcons ?? 0}
+                    totalRenderedShips={fleetStats?.totalRenderedShips ?? 0}
+                    trackedShips={fleetStats?.trackedShips ?? 0}
+                />
             </div>
         </>
     );
