@@ -1,5 +1,6 @@
 import { PropsWithChildren } from 'react';
 import StatusBar from '../Components/StatusBar';
+import HeaderBar from '../Components/HeaderBar';
 import { FaDisplay } from 'react-icons/fa6';
 
 export default function MainLayout({ children }: PropsWithChildren) {
@@ -21,7 +22,8 @@ export default function MainLayout({ children }: PropsWithChildren) {
             </div>
 
             {/* Main content - hidden below 350px */}
-            <div className="max-[349px]:hidden">
+            <div className="max-[349px]:hidden min-h-screen bg-zinc-950">
+                <HeaderBar />
                 {children}
                 <StatusBar />
             </div>
