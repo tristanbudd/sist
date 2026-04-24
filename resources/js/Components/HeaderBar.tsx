@@ -63,7 +63,49 @@ const SAMPLE_PORTS = [
 
 const ALL_RESULTS = [...SAMPLE_VESSELS, ...SAMPLE_PORTS];
 
-const COORD_REGEX = /^([-+]?\d{1,2}(?:\.\d+)?),\s*([-+]?\d{1,3}(?:\.\d+)?)$/;
+const parseVesselCoords = (input: string): { lat: number; lon: number } | null => {
+    const q = input.trim();
+
+    // Standard DD: 51.5074, -0.1278
+    const stdDD = q.match(/^([-+]?\d{1,2}(?:\.\d+)?),\s*([-+]?\d{1,3}(?:\.\d+)?)$/);
+    if (stdDD) return { lat: parseFloat(stdDD[1]), lon: parseFloat(stdDD[2]) };
+
+    // DD with Hemispheres: 37.401573° N, 116.867808° W
+    const hemiDD = q.match(/^(\d+(?:\.\d+)?)°?\s*([NSns]),?\s*(\d+(?:\.\d+)?)°?\s*([EWew])$/);
+    if (hemiDD) {
+        let lat = parseFloat(hemiDD[1]);
+        let lon = parseFloat(hemiDD[3]);
+        if (hemiDD[2].toUpperCase() === 'S') lat *= -1;
+        if (hemiDD[4].toUpperCase() === 'W') lon *= -1;
+        return { lat, lon };
+    }
+
+    // DMS: 12° 22′ 13.32″ N, 23° 19′ 20.18″ E
+    // Regex allows optional degree, minute, second symbols and various quote marks
+    const dms = q.match(
+        /^(\d+)°?\s*(\d+)[′']?\s*(\d+(?:\.\d+)?)[″"]?\s*([NSns]),?\s*(\d+)°?\s*(\d+)[′']?\s*(\d+(?:\.\d+)?)[″"]?\s*([EWew])$/
+    );
+    if (dms) {
+        const d1 = parseFloat(dms[1]),
+            m1 = parseFloat(dms[2]),
+            s1 = parseFloat(dms[3]),
+            h1 = dms[4].toUpperCase();
+        const d2 = parseFloat(dms[5]),
+            m2 = parseFloat(dms[6]),
+            s2 = parseFloat(dms[7]),
+            h2 = dms[8].toUpperCase();
+
+        let lat = d1 + m1 / 60 + s1 / 3600;
+        let lon = d2 + m2 / 60 + s2 / 3600;
+
+        if (h1 === 'S') lat *= -1;
+        if (h2 === 'W') lon *= -1;
+
+        return { lat, lon };
+    }
+
+    return null;
+};
 
 export default function HeaderBar() {
     const [query, setQuery] = useState('');
@@ -114,17 +156,16 @@ export default function HeaderBar() {
             const q = query.trim();
 
             // 1. Check for coordinates
-            const coordMatch = q.match(COORD_REGEX);
-            if (coordMatch) {
-                const lat = parseFloat(coordMatch[1]);
-                const lon = parseFloat(coordMatch[2]);
+            const coords = parseVesselCoords(q);
+            if (coords) {
+                const { lat, lon } = coords;
                 if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
                     setError(
                         'Invalid coordinates: Values outside Earth boundaries (Lat: -90/90, Lon: -180/180)'
                     );
                     return;
                 }
-                console.log(`NAVIGATING TO COORDINATES: [${lat}, ${lon}]`);
+                console.log(`NAVIGATING TO COORDINATES: [${lat.toFixed(6)}, ${lon.toFixed(6)}]`);
                 setError(null);
                 setShowSuggestions(false);
                 return;
