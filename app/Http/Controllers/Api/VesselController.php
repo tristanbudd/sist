@@ -72,6 +72,14 @@ class VesselController extends Controller
                 'lat',
                 'lng',
                 'course',
+            ])
+            ->map(fn ($vessel) => [
+                'mmsi' => (int) $vessel->mmsi,
+                'imo' => (int) $vessel->imo,
+                'name' => $vessel->name,
+                'lat' => (float) $vessel->lat,
+                'lng' => (float) $vessel->lng,
+                'course' => (float) $vessel->course,
             ]);
 
         if ($vessels->isEmpty()) {
