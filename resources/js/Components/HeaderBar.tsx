@@ -2,12 +2,41 @@ import { useState, useMemo } from 'react';
 import { FaSearch, FaShip, FaAnchor } from 'react-icons/fa';
 import portsGeoJson from '../../data/ports.json';
 
-const SAMPLE_VESSELS = [
+interface Vessel {
+    name: string;
+    mmsi: string;
+    imo: string;
+    category: 'vessel';
+    lat: number;
+    lon: number;
+}
+
+interface Port {
+    category: 'port';
+    name: string;
+    code: string;
+    country: string;
+    lat: number;
+    lon: number;
+}
+
+type SearchResult = Vessel | Port;
+
+interface Coordinates {
+    lat: number;
+    lon: number;
+}
+
+interface HeaderBarProps {
+    onNavigate?: (lat: number, lon: number, zoom: number) => void;
+}
+
+const SAMPLE_VESSELS: Vessel[] = [
     {
         name: 'OCEAN EXPLORER',
         mmsi: '235114700',
         imo: '9153549',
-        category: 'vessel' as const,
+        category: 'vessel',
         lat: 51.5074,
         lon: -0.1278,
     },
@@ -15,7 +44,7 @@ const SAMPLE_VESSELS = [
         name: 'ARCTIC TERN',
         mmsi: '231001000',
         imo: '8901234',
-        category: 'vessel' as const,
+        category: 'vessel',
         lat: 64.1265,
         lon: -21.8174,
     },
@@ -23,7 +52,7 @@ const SAMPLE_VESSELS = [
         name: 'GLOBAL TRADER',
         mmsi: '351123000',
         imo: '9412345',
-        category: 'vessel' as const,
+        category: 'vessel',
         lat: 1.2902,
         lon: 103.8519,
     },
@@ -31,7 +60,7 @@ const SAMPLE_VESSELS = [
         name: 'PACIFIC STAR',
         mmsi: '563001000',
         imo: '9876543',
-        category: 'vessel' as const,
+        category: 'vessel',
         lat: 34.0522,
         lon: -118.2437,
     },
@@ -39,7 +68,7 @@ const SAMPLE_VESSELS = [
         name: 'NORTH SEA GIANT',
         mmsi: '257545000',
         imo: '9523964',
-        category: 'vessel' as const,
+        category: 'vessel',
         lat: 58.969,
         lon: 5.7331,
     },
@@ -47,7 +76,7 @@ const SAMPLE_VESSELS = [
         name: 'BLUE WHALE',
         mmsi: '477312600',
         imo: '9616759',
-        category: 'vessel' as const,
+        category: 'vessel',
         lat: 22.3193,
         lon: 114.1694,
     },
@@ -55,7 +84,7 @@ const SAMPLE_VESSELS = [
         name: 'EVER GIVEN',
         mmsi: '353136000',
         imo: '9811000',
-        category: 'vessel' as const,
+        category: 'vessel',
         lat: 29.9745,
         lon: 32.5418,
     },
@@ -63,13 +92,13 @@ const SAMPLE_VESSELS = [
         name: 'VIKING GRACE',
         mmsi: '230629000',
         imo: '9606900',
-        category: 'vessel' as const,
+        category: 'vessel',
         lat: 60.4518,
         lon: 22.2666,
     },
 ];
 
-const WORLD_PORTS = (portsGeoJson as any).features.map((feature: any) => ({
+const WORLD_PORTS: Port[] = portsGeoJson.features.map((feature) => ({
     category: 'port' as const,
     name: feature.properties.Name.toUpperCase(),
     code: feature.properties.LOCODE,
@@ -78,9 +107,9 @@ const WORLD_PORTS = (portsGeoJson as any).features.map((feature: any) => ({
     lon: feature.geometry.coordinates[0],
 }));
 
-const ALL_RESULTS = [...SAMPLE_VESSELS, ...WORLD_PORTS];
+const ALL_RESULTS: SearchResult[] = [...SAMPLE_VESSELS, ...WORLD_PORTS];
 
-const parseVesselCoords = (input: string) => {
+const parseVesselCoords = (input: string): Coordinates | null => {
     const q = input.trim();
 
     const stdDD = q.match(/^([-+]?\d{1,2}(?:\.\d+)?),\s*([-+]?\d{1,3}(?:\.\d+)?)$/);
@@ -124,10 +153,6 @@ const parseVesselCoords = (input: string) => {
     return null;
 };
 
-interface HeaderBarProps {
-    onNavigate?: (lat: number, lon: number, zoom?: number) => void;
-}
-
 export default function HeaderBar({ onNavigate }: HeaderBarProps) {
     const [query, setQuery] = useState('');
     const [showSuggestions, setShowSuggestions] = useState(false);
@@ -137,7 +162,7 @@ export default function HeaderBar({ onNavigate }: HeaderBarProps) {
     const suggestions = useMemo(() => {
         const q = query.toUpperCase().trim();
 
-        const matches = ALL_RESULTS.filter((item) => {
+        const matches = ALL_RESULTS.filter((item: SearchResult) => {
             if (!q) return true;
             if (item.category === 'vessel') {
                 return (
@@ -154,7 +179,6 @@ export default function HeaderBar({ onNavigate }: HeaderBarProps) {
         });
 
         return matches.sort((a, b) => {
-            // Vessels prioritized before Ports
             if (a.category !== b.category) {
                 return a.category === 'vessel' ? -1 : 1;
             }
@@ -164,7 +188,7 @@ export default function HeaderBar({ onNavigate }: HeaderBarProps) {
 
     const displayedSuggestions = useMemo(() => suggestions.slice(0, limit), [suggestions, limit]);
 
-    const handleSelect = (item: any) => {
+    const handleSelect = (item: SearchResult) => {
         if (onNavigate) {
             onNavigate(item.lat, item.lon, 14);
         }
@@ -261,14 +285,13 @@ export default function HeaderBar({ onNavigate }: HeaderBarProps) {
                 {showSuggestions && !error && suggestions.length > 0 && (
                     <div className="absolute top-full left-0 right-0 bg-zinc-950 border-x border-b border-white/20 shadow-2xl mt-px max-h-[400px] overflow-y-auto">
                         {!query.trim() && (
-                            <div className="px-4 py-2 border-b border-white/5 bg-white/[0.02]">
+                            <div className="px-4 py-2 border-b border-white/5 bg-white/2">
                                 <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-[0.2em]">
                                     Quick Search
                                 </span>
                             </div>
                         )}
 
-                        {/* Vessels */}
                         {displayedSuggestions.some((i) => i.category === 'vessel') && (
                             <div className="px-4 py-2 bg-zinc-900/30 border-b border-white/5">
                                 <span className="text-[8px] font-black text-white/40 uppercase tracking-[0.25em]">
@@ -277,7 +300,7 @@ export default function HeaderBar({ onNavigate }: HeaderBarProps) {
                             </div>
                         )}
                         {displayedSuggestions
-                            .filter((i) => i.category === 'vessel')
+                            .filter((i): i is Vessel => i.category === 'vessel')
                             .map((item) => (
                                 <button
                                     key={item.mmsi}
@@ -298,16 +321,17 @@ export default function HeaderBar({ onNavigate }: HeaderBarProps) {
                                 </button>
                             ))}
 
-                        {/* Ports */}
                         {displayedSuggestions.some((i) => i.category === 'port') && (
-                            <div className="px-4 py-2 bg-zinc-900/30 border-b border-white/5 mt-2">
+                            <div
+                                className={`px-4 py-2 bg-zinc-900/30 border-b border-white/5 ${displayedSuggestions.some((i) => i.category === 'vessel') ? 'mt-2' : ''}`}
+                            >
                                 <span className="text-[8px] font-black text-white/40 uppercase tracking-[0.25em]">
                                     Ports
                                 </span>
                             </div>
                         )}
                         {displayedSuggestions
-                            .filter((i) => i.category === 'port')
+                            .filter((i): i is Port => i.category === 'port')
                             .map((item) => (
                                 <button
                                     key={item.code}
@@ -328,21 +352,37 @@ export default function HeaderBar({ onNavigate }: HeaderBarProps) {
                                 </button>
                             ))}
 
-                        <div className="flex items-center justify-between px-4 py-2 bg-white/[0.02] border-t border-white/5">
-                            <span className="text-[9px] text-zinc-500 font-medium">
-                                Showing {displayedSuggestions.length} of {suggestions.length} found
-                            </span>
-                            {suggestions.length > limit && (
-                                <button
-                                    type="button"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setLimit((prev) => prev + 5);
-                                    }}
-                                    className="text-[9px] text-zinc-300 hover:text-white font-bold uppercase tracking-wider px-2 py-1"
-                                >
-                                    Show more
-                                </button>
+                        <div className="flex flex-col gap-2 px-4 py-2 bg-white/2 border-t border-white/5">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[9px] text-zinc-500 font-medium">
+                                    Showing {displayedSuggestions.length} of {suggestions.length}{' '}
+                                    found
+                                </span>
+                                {suggestions.length > limit && (
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setLimit((prev) => prev + 5);
+                                        }}
+                                        className="text-[9px] text-zinc-300 hover:text-white font-bold uppercase tracking-wider px-2 py-1"
+                                    >
+                                        Show more
+                                    </button>
+                                )}
+                            </div>
+                            {displayedSuggestions.some((i) => i.category === 'port') && (
+                                <div className="text-[7px] text-zinc-600 uppercase tracking-widest text-center border-t border-white/5 pt-2 pb-0">
+                                    Port Data:{' '}
+                                    <a
+                                        href="https://datacatalog.worldbank.org/search/dataset/0038118/global-international-ports"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="hover:text-zinc-400 transition-colors"
+                                    >
+                                        World Bank Group
+                                    </a>
+                                </div>
                             )}
                         </div>
                     </div>
