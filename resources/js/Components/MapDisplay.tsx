@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import { FaPlus, FaMinus, FaShip, FaGaugeHigh, FaCompass } from 'react-icons/fa6';
 import L from 'leaflet';
 import axios from 'axios';
+import portsData from '../../data/ports.json';
 
 // @ts-expect-error - Leaflet icon fix
 delete L.Icon.Default.prototype._getIconUrl;
@@ -307,6 +308,86 @@ function FleetLayer({
     );
 }
 
+function PortLayer() {
+    const map = useMap();
+    const [zoom, setZoom] = useState(map.getZoom());
+
+    useMapEvents({
+        zoomend: () => setZoom(map.getZoom()),
+    });
+
+    const visiblePorts = useMemo(() => {
+        if (zoom < 6) return [];
+
+        const filtered: any[] = [];
+        const minDistancePx = zoom < 7 ? 25 : zoom < 10 ? 15 : 0;
+
+        if (minDistancePx === 0) return portsData.features;
+
+        portsData.features.forEach((port: any) => {
+            const pos = map.latLngToLayerPoint([
+                port.geometry.coordinates[1],
+                port.geometry.coordinates[0],
+            ]);
+            const tooClose = filtered.some((f) => {
+                const fPos = map.latLngToLayerPoint([
+                    f.geometry.coordinates[1],
+                    f.geometry.coordinates[0],
+                ]);
+                const dist = Math.sqrt(Math.pow(pos.x - fPos.x, 2) + Math.pow(pos.y - fPos.y, 2));
+                return dist < minDistancePx;
+            });
+
+            if (!tooClose) {
+                filtered.push(port);
+            }
+        });
+
+        return filtered;
+    }, [map, zoom]);
+
+    const portIcon = L.divIcon({
+        className: 'port-icon-container',
+        html: `
+            <div style="display: flex; align-items: center; justify-content: center; color: #22d3ee; filter: drop-shadow(0 0 2px rgba(0,0,0,0.5));">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2a3 3 0 0 1 3 3 3 3 0 0 1-3 3 3 3 0 0 1-3-3 3 3 0 0 1 3-3m0 2a1 1 0 0 0-1 1 1 1 0 0 0 1 1 1 1 0 0 0 1-1 1 1 0 0 0-1-1m7 12h-2c0-2.76-2.24-5-5-5s-5 2.24-5 5H5c0-3.53 2.61-6.43 6-6.92V8h2v1.08c3.39.49 6 3.39 6 6.92m-7 6c-3.87 0-7-3.13-7-7h2a5 5 0 0 0 5 5 5 5 0 0 0 5-5h2c0 3.87-3.13 7-7 7z"/>
+                </svg>
+            </div>
+        `,
+        iconSize: [14, 14],
+        iconAnchor: [7, 7],
+    });
+
+    return (
+        <>
+            {visiblePorts.map((port: any) => (
+                <Marker
+                    key={port.properties.LOCODE}
+                    position={[port.geometry.coordinates[1], port.geometry.coordinates[0]]}
+                    icon={portIcon}
+                >
+                    <Popup className="vessel-popup">
+                        <div className="bg-zinc-950 text-white p-1 min-w-[150px]">
+                            <div className="border-b border-white/10 pb-1 mb-1">
+                                <span className="font-bold text-xs uppercase tracking-wider text-cyan-400">
+                                    {port.properties.Name}
+                                </span>
+                            </div>
+                            <div className="text-[10px] text-zinc-400">
+                                {port.properties.Country}
+                            </div>
+                            <div className="text-[9px] text-zinc-500 font-mono mt-1">
+                                {port.properties.LOCODE}
+                            </div>
+                        </div>
+                    </Popup>
+                </Marker>
+            ))}
+        </>
+    );
+}
+
 function ZoomControls() {
     const map = useMap();
 
@@ -372,6 +453,7 @@ export default function MapDisplay({ center = [20, 0], zoom = 3, onFleetUpdate }
                 />
 
                 <FleetLayer onUpdate={onFleetUpdate} />
+                <PortLayer />
                 <MapViewHandler center={center} zoom={zoom} />
                 <ZoomControls />
             </MapContainer>
