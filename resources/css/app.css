@@ -70,4 +70,26 @@
     .leaflet-control-attribution a {
         color: #a1a1aa !important;
     }
+
+    /* Popup Styling Overrides */
+    .leaflet-popup-content-wrapper {
+        background: transparent !important;
+        color: white !important;
+        padding: 0 !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+    }
+
+    .leaflet-popup-content {
+        margin: 0 !important;
+        width: auto !important;
+    }
+
+    .leaflet-popup-tip-container {
+        display: none !important;
+    }
+
+    .leaflet-popup-close-button {
+        display: none !important;
+    }
 }

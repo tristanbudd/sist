@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { MapContainer, TileLayer, useMap, Marker, Popup, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { FaPlus, FaMinus } from 'react-icons/fa6';
+import { FaPlus, FaMinus, FaXmark } from 'react-icons/fa6';
 import L from 'leaflet';
 import axios from 'axios';
 import portsData from '../../data/ports.json';
@@ -467,17 +467,26 @@ function PortLayer() {
                     position={[port.geometry.coordinates[1], port.geometry.coordinates[0]]}
                     icon={portIcon}
                 >
-                    <Popup className="vessel-popup">
-                        <div className="bg-zinc-950 text-white p-1 min-w-[180px]">
-                            <div className="border-b border-white/10 pb-1 mb-1 pr-8">
-                                <span className="font-bold text-xs uppercase tracking-wider text-cyan-400">
+                    <Popup closeButton={false} minWidth={200}>
+                        <div className="bg-zinc-950 border border-white/20 shadow-2xl p-4 min-w-[200px]">
+                            <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-2 mb-2">
+                                <span className="font-bold text-xs uppercase tracking-wider text-cyan-400 truncate">
                                     {port.properties.Name}
                                 </span>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        map.closePopup();
+                                    }}
+                                    className="text-zinc-500 hover:text-white transition-colors"
+                                >
+                                    <FaXmark className="w-3 h-3" />
+                                </button>
                             </div>
-                            <div className="text-[10px] text-zinc-400">
+                            <div className="text-[10px] text-zinc-400 uppercase font-bold tracking-tight">
                                 {port.properties.Country}
                             </div>
-                            <div className="text-[9px] text-zinc-500 font-mono mt-1">
+                            <div className="text-[9px] text-zinc-500 font-mono mt-1 opacity-60">
                                 {port.properties.LOCODE}
                             </div>
                         </div>
