@@ -49,6 +49,7 @@ interface City {
     category: 'city';
     name: string;
     country: string;
+    iso: string;
     lat: number;
     lon: number;
 }
@@ -105,6 +106,14 @@ const WORLD_COUNTRIES: Country[] = (countriesJson as CountryData[]).map((c) => (
     lon: c.lng,
 }));
 
+const COUNTRY_LOOKUP: Record<string, string> = (countriesJson as CountryData[]).reduce(
+    (acc, c) => {
+        acc[c.cca2] = c.name.toUpperCase();
+        return acc;
+    },
+    {} as Record<string, string>
+);
+
 const WORLD_CONTINENTS: Continent[] = [
     { category: 'continent', name: 'AFRICA', lat: 1.6508, lon: 17.321 },
     { category: 'continent', name: 'ANTARCTICA', lat: -75.2509, lon: -0.0713 },
@@ -122,11 +131,18 @@ const WORLD_OCEANS: Ocean[] = [
     { category: 'ocean', name: 'PACIFIC OCEAN', lat: 0, lon: -160 },
     { category: 'ocean', name: 'SOUTHERN OCEAN', lat: -60, lon: 0 },
 ];
+interface RawCityData {
+    name: string;
+    lat: number;
+    lon: number;
+    country: string;
+}
 
-const WORLD_CITIES: City[] = (citiesJson as any[]).map((c) => ({
+const WORLD_CITIES: City[] = (citiesJson as RawCityData[]).map((c) => ({
     category: 'city' as const,
     name: c.name.toUpperCase(),
-    country: c.country,
+    country: COUNTRY_LOOKUP[c.country] || c.country,
+    iso: c.country,
     lat: c.lat,
     lon: c.lon,
 }));
@@ -465,7 +481,7 @@ export default function HeaderBar({
                                                               : cat === 'country'
                                                                 ? `ISO: ${(item as Country).cca2}`
                                                                 : cat === 'city'
-                                                                  ? `COUNTRY: ${(item as City).country}`
+                                                                  ? `COUNTRY: ${(item as City).country} (${(item as City).iso})`
                                                                   : cat === 'continent'
                                                                     ? 'Region'
                                                                     : 'Water Body'}

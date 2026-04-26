@@ -1,10 +1,20 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { MapContainer, TileLayer, useMap, Marker, Popup, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { FaPlus, FaMinus, FaXmark } from 'react-icons/fa6';
+import {
+    FaPlus,
+    FaMinus,
+    FaXmark,
+    FaLayerGroup,
+    FaCity,
+    FaAnchor,
+    FaLocationArrow,
+} from 'react-icons/fa6';
 import L from 'leaflet';
 import axios from 'axios';
 import portsData from '../../data/ports.json';
+import countriesData from '../../data/countries.json';
+import citiesData from '../../data/cities.json';
 
 // @ts-expect-error - Leaflet icon fix
 delete L.Icon.Default.prototype._getIconUrl;
@@ -18,6 +28,14 @@ const MAX_BOUNDS: L.LatLngBoundsExpression = [
     [-90, -180],
     [90, 180],
 ];
+
+const COUNTRY_NAMES: Record<string, string> = (countriesData as any[]).reduce(
+    (acc, c) => {
+        acc[c.cca2] = c.name;
+        return acc;
+    },
+    {} as Record<string, string>
+);
 
 export interface Vessel {
     mmsi: number;
@@ -373,27 +391,32 @@ function FleetLayer({
     }, [visibleVessels, trackedCount, trackedSearchVessels, onUpdate, map, zoom, getAreaName]);
 
     const createVesselIcon = (course: number, isCluster: boolean, isSelected: boolean) => {
-        const singleArrow = `
-            <path d="M12 2L4.5 20.29L5.21 21L12 18L18.79 21L19.5 20.29L12 2Z" />
-        `;
-        const doubleArrow = `
-            <path d="M12 2L4.5 20.29L5.21 21L12 18L18.79 21L19.5 20.29L12 2Z" />
-            <path d="M12 8L7 20L12 18L17 20L12 8Z" opacity="0.6" />
+        const color = isSelected ? '#ef4444' : 'white';
+        const shadowColor = isSelected ? 'rgba(239, 68, 68, 0.4)' : 'rgba(255, 255, 255, 0.4)';
+        const arrowPath = 'M12 2L4.5 20.29L5.21 21L12 18L18.79 21L19.5 20.29L12 2Z';
+
+        const singleIcon = `
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="${color}" stroke="black" stroke-width="1">
+                <path d="${arrowPath}" />
+            </svg>
         `;
 
-        const color = isSelected ? '#ef4444' : 'white';
+        const clusterIcon = `
+            <svg width="22" height="22" viewBox="0 0 24 24" style="position: relative;">
+                <path d="${arrowPath}" fill="${shadowColor}" stroke="black" stroke-width="1" style="transform: translate(2px, 2px);" />
+                <path d="${arrowPath}" fill="${color}" stroke="black" stroke-width="1" />
+            </svg>
+        `;
 
         return L.divIcon({
             className: 'vessel-icon-container',
             html: `
                 <div style="transform: rotate(${course}deg); display: flex; align-items: center; justify-content: center;">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="${color}" stroke="black" stroke-width="1">
-                        ${isCluster ? doubleArrow : singleArrow}
-                    </svg>
+                    ${isCluster ? clusterIcon : singleIcon}
                 </div>
             `,
-            iconSize: [18, 18],
-            iconAnchor: [9, 9],
+            iconSize: [22, 22],
+            iconAnchor: [11, 11],
         });
     };
 
@@ -500,9 +523,14 @@ interface PortFeature {
 function PortLayer() {
     const map = useMap();
     const [zoom, setZoom] = useState(map.getZoom());
+    const [bounds, setBounds] = useState(map.getBounds());
 
     useMapEvents({
-        zoomend: () => setZoom(map.getZoom()),
+        zoomend: () => {
+            setZoom(map.getZoom());
+            setBounds(map.getBounds());
+        },
+        moveend: () => setBounds(map.getBounds()),
     });
 
     const visiblePorts = useMemo(() => {
@@ -512,21 +540,25 @@ function PortLayer() {
         const filtered: PortFeature[] = [];
         const minDistancePx = zoom < 7 ? 25 : zoom < 10 ? 15 : 0;
 
-        if (minDistancePx === 0) return portsDataTyped.features;
-
         portsDataTyped.features.forEach((port) => {
-            const pos = map.latLngToLayerPoint([
-                port.geometry.coordinates[1],
-                port.geometry.coordinates[0],
-            ]);
-            const tooClose = filtered.some((f) => {
-                const fPos = map.latLngToLayerPoint([
-                    f.geometry.coordinates[1],
-                    f.geometry.coordinates[0],
-                ]);
-                const dist = Math.sqrt(Math.pow(pos.x - fPos.x, 2) + Math.pow(pos.y - fPos.y, 2));
-                return dist < minDistancePx;
-            });
+            const lat = port.geometry.coordinates[1];
+            const lng = port.geometry.coordinates[0];
+
+            if (!bounds.contains([lat, lng])) return;
+
+            const pos = map.latLngToLayerPoint([lat, lng]);
+            const tooClose =
+                minDistancePx > 0 &&
+                filtered.some((f) => {
+                    const fPos = map.latLngToLayerPoint([
+                        f.geometry.coordinates[1],
+                        f.geometry.coordinates[0],
+                    ]);
+                    const dist = Math.sqrt(
+                        Math.pow(pos.x - fPos.x, 2) + Math.pow(pos.y - fPos.y, 2)
+                    );
+                    return dist < minDistancePx;
+                });
 
             if (!tooClose) {
                 filtered.push(port);
@@ -534,7 +566,7 @@ function PortLayer() {
         });
 
         return filtered;
-    }, [map, zoom]);
+    }, [map, zoom, bounds]);
 
     const portIcon = L.divIcon({
         className: 'port-icon-container',
@@ -584,6 +616,251 @@ function PortLayer() {
                 </Marker>
             ))}
         </>
+    );
+}
+
+interface City {
+    name: string;
+    country: string;
+    lat: number;
+    lon: number;
+}
+
+function CityLayer() {
+    const map = useMap();
+    const [zoom, setZoom] = useState(map.getZoom());
+    const [bounds, setBounds] = useState(map.getBounds());
+
+    useMapEvents({
+        zoomend: () => {
+            setZoom(map.getZoom());
+            setBounds(map.getBounds());
+        },
+        moveend: () => setBounds(map.getBounds()),
+    });
+
+    const visibleCities = useMemo(() => {
+        if (zoom < 8) return [];
+
+        const cities = citiesData as unknown as City[];
+        const filtered: City[] = [];
+        const minDistancePx = zoom < 10 ? 50 : zoom < 12 ? 30 : zoom < 14 ? 15 : 0;
+        const MAX_CITIES = 250;
+
+        for (let i = 0; i < cities.length; i++) {
+            const city = cities[i];
+
+            // Fast bounds check
+            if (
+                city.lat < bounds.getSouth() ||
+                city.lat > bounds.getNorth() ||
+                city.lon < bounds.getWest() ||
+                city.lon > bounds.getEast()
+            ) {
+                continue;
+            }
+
+            if (minDistancePx > 0) {
+                const pos = map.latLngToLayerPoint([city.lat, city.lon]);
+                const tooClose = filtered.some((f) => {
+                    const fPos = map.latLngToLayerPoint([f.lat, f.lon]);
+                    const distSq = Math.pow(pos.x - fPos.x, 2) + Math.pow(pos.y - fPos.y, 2);
+                    return distSq < minDistancePx * minDistancePx;
+                });
+
+                if (tooClose) continue;
+            }
+
+            filtered.push(city);
+            if (filtered.length >= MAX_CITIES) break;
+        }
+
+        return filtered;
+    }, [map, zoom, bounds]);
+
+    const cityIcon = L.divIcon({
+        className: 'city-icon-container',
+        html: `
+            <div style="display: flex; align-items: center; justify-content: center; color: #22c55e; filter: drop-shadow(0 0 2px rgba(0,0,0,0.5));">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M15 11V5l-3-3-3 3v2H3v14h18V11h-6zm-8 8H5v-2h2v2zm0-4H5v-2h2v2zm0-4H5V9h2v2zm6 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V9h2v2zm0-4h-2V5h2v2zm6 12h-2v-2h2v2zm0-4h-2v-2h2v2z"/>
+                </svg>
+            </div>
+        `,
+        iconSize: [12, 12],
+        iconAnchor: [6, 6],
+    });
+
+    return (
+        <>
+            {visibleCities.map((city: City, idx: number) => (
+                <Marker
+                    key={`city-${city.name}-${idx}`}
+                    position={[city.lat, city.lon]}
+                    icon={cityIcon}
+                >
+                    <Popup closeButton={false} minWidth={150}>
+                        <div className="bg-zinc-950 border border-white/20 shadow-2xl p-4 min-w-[150px]">
+                            <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-2 mb-2">
+                                <span className="font-bold text-xs uppercase tracking-wider text-green-400 truncate">
+                                    {city.name}
+                                </span>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        map.closePopup();
+                                    }}
+                                    className="text-zinc-500 hover:text-white transition-colors"
+                                >
+                                    <FaXmark className="w-3 h-3" />
+                                </button>
+                            </div>
+                            <div className="text-[10px] text-zinc-400 uppercase font-bold tracking-tight">
+                                {COUNTRY_NAMES[city.country] || city.country}
+                            </div>
+                            <div className="text-[9px] text-zinc-500 font-mono mt-1 opacity-60">
+                                {city.country}
+                            </div>
+                        </div>
+                    </Popup>
+                </Marker>
+            ))}
+        </>
+    );
+}
+
+function LayerControl({
+    showVessels,
+    setShowVessels,
+    showPorts,
+    setShowPorts,
+    showCities,
+    setShowCities,
+}: {
+    showVessels: boolean;
+    setShowVessels: (v: boolean) => void;
+    showPorts: boolean;
+    setShowPorts: (v: boolean) => void;
+    showCities: boolean;
+    setShowCities: (v: boolean) => void;
+}) {
+    const [isOpen, setIsOpen] = useState(false);
+
+    return (
+        <div className="absolute left-4 bottom-12 z-1000 flex flex-col items-start gap-2 pointer-events-auto">
+            {isOpen && (
+                <div className="bg-zinc-950 border border-white/20 p-4 shadow-2xl flex flex-col gap-4 min-w-[200px] animate-in slide-in-from-bottom-2 duration-200">
+                    <div className="flex flex-col gap-3">
+                        <span className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] border-b border-white/10 pb-2">
+                            Map Layers
+                        </span>
+                        <div className="flex flex-col gap-2">
+                            <button
+                                onClick={() => setShowVessels(!showVessels)}
+                                className="flex items-center justify-between group cursor-pointer"
+                            >
+                                <span
+                                    className={`text-[11px] font-bold uppercase tracking-wider transition-colors ${showVessels ? 'text-white' : 'text-zinc-600'}`}
+                                >
+                                    Vessels
+                                </span>
+                                <div
+                                    className={`w-8 h-4 border transition-colors relative ${showVessels ? 'bg-white border-white' : 'border-zinc-800 bg-transparent'}`}
+                                >
+                                    <div
+                                        className={`absolute top-0.5 bottom-0.5 w-3 transition-all ${showVessels ? 'right-0.5 bg-black' : 'left-0.5 bg-zinc-800'}`}
+                                    />
+                                </div>
+                            </button>
+
+                            <button
+                                onClick={() => setShowPorts(!showPorts)}
+                                className="flex items-center justify-between group cursor-pointer"
+                            >
+                                <span
+                                    className={`text-[11px] font-bold uppercase tracking-wider transition-colors ${showPorts ? 'text-white' : 'text-zinc-600'}`}
+                                >
+                                    Ports
+                                </span>
+                                <div
+                                    className={`w-8 h-4 border transition-colors relative ${showPorts ? 'bg-white border-white' : 'border-zinc-800 bg-transparent'}`}
+                                >
+                                    <div
+                                        className={`absolute top-0.5 bottom-0.5 w-3 transition-all ${showPorts ? 'right-0.5 bg-black' : 'left-0.5 bg-zinc-800'}`}
+                                    />
+                                </div>
+                            </button>
+
+                            <button
+                                onClick={() => setShowCities(!showCities)}
+                                className="flex items-center justify-between group cursor-pointer"
+                            >
+                                <span
+                                    className={`text-[11px] font-bold uppercase tracking-wider transition-colors ${showCities ? 'text-white' : 'text-zinc-600'}`}
+                                >
+                                    Cities
+                                </span>
+                                <div
+                                    className={`w-8 h-4 border transition-colors relative ${showCities ? 'bg-white border-white' : 'border-zinc-800 bg-transparent'}`}
+                                >
+                                    <div
+                                        className={`absolute top-0.5 bottom-0.5 w-3 transition-all ${showCities ? 'right-0.5 bg-black' : 'left-0.5 bg-zinc-800'}`}
+                                    />
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                        <span className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] border-b border-white/10 pb-2">
+                            Legend
+                        </span>
+                        <div className="flex flex-col gap-2.5">
+                            <div className="flex items-center gap-3">
+                                <div className="w-5 h-5 bg-zinc-900 border border-white/10 flex items-center justify-center">
+                                    <FaLocationArrow className="w-2.5 h-2.5 text-white -rotate-45" />
+                                </div>
+                                <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-tight">
+                                    Tracked Vessel
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <div className="w-5 h-5 bg-zinc-900 border border-white/10 flex items-center justify-center relative">
+                                    <FaLocationArrow className="w-2.5 h-2.5 text-white -rotate-45" />
+                                    <FaLocationArrow className="w-2.5 h-2.5 text-white/40 -rotate-45 absolute translate-x-1 translate-y-1" />
+                                </div>
+                                <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-tight">
+                                    Vessel Cluster
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <div className="w-5 h-5 bg-zinc-900 border border-white/10 flex items-center justify-center">
+                                    <FaAnchor className="w-2.5 h-2.5 text-cyan-400" />
+                                </div>
+                                <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-tight">
+                                    International Port
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <div className="w-5 h-5 bg-zinc-900 border border-white/10 flex items-center justify-center">
+                                    <FaCity className="w-2.5 h-2.5 text-green-500" />
+                                </div>
+                                <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-tight">
+                                    Major City
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className={`w-10 h-10 border flex items-center justify-center transition-all shadow-2xl active:scale-95 ${isOpen ? 'bg-white text-black border-white' : 'bg-zinc-950 text-white border-white/20 hover:bg-zinc-900'}`}
+                title="Map Layers & Legend"
+            >
+                <FaLayerGroup className="w-4 h-4" />
+            </button>
+        </div>
     );
 }
 
@@ -646,6 +923,10 @@ export default function MapDisplay({
     onVesselSelect,
     onClusterZoomNotice,
 }: MapDisplayProps) {
+    const [showVessels, setShowVessels] = useState(true);
+    const [showPorts, setShowPorts] = useState(true);
+    const [showCities, setShowCities] = useState(false);
+
     return (
         <div className="fixed inset-0 z-0 bg-zinc-950">
             <MapContainer
@@ -663,15 +944,26 @@ export default function MapDisplay({
                     url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
                 />
 
-                <PortLayer />
-                <FleetLayer
-                    onUpdate={onFleetUpdate}
-                    selectedMmsi={selectedMmsi}
-                    onVesselSelect={onVesselSelect}
-                    onClusterZoomNotice={onClusterZoomNotice}
-                />
+                {showPorts && <PortLayer />}
+                {showCities && <CityLayer />}
+                {showVessels && (
+                    <FleetLayer
+                        onUpdate={onFleetUpdate}
+                        selectedMmsi={selectedMmsi}
+                        onVesselSelect={onVesselSelect}
+                        onClusterZoomNotice={onClusterZoomNotice}
+                    />
+                )}
                 <MapViewHandler center={center} zoom={zoom} />
                 <ZoomControls />
+                <LayerControl
+                    showVessels={showVessels}
+                    setShowVessels={setShowVessels}
+                    showPorts={showPorts}
+                    setShowPorts={setShowPorts}
+                    showCities={showCities}
+                    setShowCities={setShowCities}
+                />
             </MapContainer>
 
             <div className="pointer-events-none absolute inset-0 z-1 shadow-[inset_0_0_150px_rgba(0,0,0,0.8)]" />
