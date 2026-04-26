@@ -238,7 +238,7 @@ function FleetLayer({
             if (Date.now() - lastActivity > IDLE_THRESHOLD) {
                 setIsIdle(true);
             }
-        }, 10000);
+        }, 5000);
         return () => clearInterval(interval);
     }, [lastActivity]);
 
@@ -429,20 +429,31 @@ function FleetLayer({
     return (
         <>
             {isIdle && (
-                <div className="absolute top-20 right-4 z-1000 animate-in fade-in slide-in-from-right-4 duration-500">
-                    <div className="bg-zinc-950/90 border border-amber-500/50 backdrop-blur-md px-3 py-2 shadow-2xl flex items-center gap-3">
-                        <div className="flex flex-col text-right">
-                            <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">
-                                Updates Paused
+                <div
+                    className="fixed inset-0 z-2000 flex items-center justify-center bg-zinc-950/40 backdrop-blur-sm animate-in fade-in duration-500 cursor-pointer p-4"
+                    onClick={recordActivity}
+                >
+                    <div className="bg-zinc-950/90 border border-amber-500/50 p-6 shadow-2xl flex flex-col items-center gap-4 text-center max-w-xs w-full animate-in zoom-in-95 duration-300">
+                        <div className="flex flex-col gap-1.5">
+                            <span className="text-[12px] font-bold text-amber-500 uppercase tracking-[0.2em]">
+                                Live Updates Paused
                             </span>
-                            <span className="text-[9px] text-zinc-500">Inactive for 2 minutes</span>
+                            <p className="text-[11px] leading-relaxed text-zinc-400">
+                                Global vessel tracking is currently paused due to inactivity to
+                                conserve system resources.
+                            </p>
                         </div>
+
                         <button
                             onClick={recordActivity}
-                            className="bg-amber-500 hover:bg-amber-400 text-black text-[10px] font-bold px-2 py-1 transition-colors active:scale-95"
+                            className="w-full bg-amber-500 hover:bg-amber-400 text-black text-[11px] font-bold px-6 py-2.5 transition-all active:scale-95 uppercase tracking-wider shadow-lg shadow-amber-500/20"
                         >
-                            Resume
+                            Resume Tracking
                         </button>
+
+                        <span className="text-[9px] text-zinc-600 italic">
+                            (Inactive for 2 minutes)
+                        </span>
                     </div>
                 </div>
             )}
