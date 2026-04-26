@@ -9,6 +9,7 @@ interface FleetStats {
     totalRenderedShips: number;
     trackedShips: number;
     trackedVessels: Vessel[];
+    currentArea: string;
 }
 
 export default function Index() {
@@ -21,6 +22,7 @@ export default function Index() {
         renderedIcons: 0,
         totalRenderedShips: 0,
         trackedShips: 0,
+        currentArea: 'WORLD OVERVIEW',
     });
 
     const [trackedVessels, setTrackedVessels] = useState<Vessel[]>([]);
@@ -37,6 +39,7 @@ export default function Index() {
             renderedIcons: stats.renderedIcons,
             totalRenderedShips: stats.totalRenderedShips,
             trackedShips: stats.trackedShips,
+            currentArea: stats.currentArea,
         });
         setTrackedVessels(stats.trackedVessels || []);
     }, []);

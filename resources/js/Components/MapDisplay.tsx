@@ -78,6 +78,7 @@ function FleetLayer({
         totalRenderedShips: number;
         trackedShips: number;
         trackedVessels: Vessel[];
+        currentArea: string;
     }) => void;
     selectedMmsi: number | null;
     onVesselSelect?: (vessel: Vessel | null) => void;
@@ -283,17 +284,93 @@ function FleetLayer({
         return filtered;
     }, [windowVessels, map, zoom]);
 
+    const getAreaName = useCallback((lat: number, lng: number, currentZoom: number) => {
+        if (currentZoom <= 3) return 'WORLD OVERVIEW';
+
+        // High Latitude / Polar
+        if (lat > 75) return 'ARCTIC REGION';
+        if (lat < -60) return 'SOUTHERN OCEAN';
+
+        // North America
+        if (lat > 15 && lat < 75 && lng > -170 && lng < -50) {
+            if (lat > 25 && lat < 50) {
+                if (lng > -130 && lng < -115) return 'US WEST COAST';
+                if (lng > -85 && lng < -65) return 'US EAST COAST';
+                if (lng > -98 && lng < -80 && lat < 31) return 'GULF OF MEXICO';
+            }
+            if (lat > 50) return 'CANADA / ALASKA';
+            if (lat < 25) return 'CENTRAL AMERICA';
+            return 'NORTH AMERICA';
+        }
+
+        // Caribbean
+        if (lat > 10 && lat < 28 && lng > -98 && lng < -55) {
+            return 'CARIBBEAN SEA';
+        }
+
+        // South America
+        if (lat > -60 && lat < 15 && lng > -95 && lng < -30) {
+            return 'SOUTH AMERICA';
+        }
+
+        // Europe
+        if (lat > 35 && lat < 75 && lng > -25 && lng < 45) {
+            if (lat > 30 && lat < 47 && lng > -6 && lng < 42) return 'MEDITERRANEAN SEA';
+            if (lat > 50 && lat < 62 && lng > -10 && lng < 10) return 'NORTHERN EUROPE';
+            if (lat > 55 && lat < 70 && lng > 10 && lng < 35) return 'BALTIC SEA';
+            return 'EUROPE';
+        }
+
+        // Africa
+        if (lat > -38 && lat < 38 && lng > -25 && lng < 55) {
+            if (lat > 12 && lat < 30 && lng > 32 && lng < 45) return 'RED SEA';
+            if (lat > -5 && lat < 15 && lng > -20 && lng < 15) return 'GULF OF GUINEA';
+            return 'AFRICA';
+        }
+
+        // Asia
+        if (lat > -10 && lat < 80 && lng > 50 && lng < 180) {
+            if (lat > 10 && lat < 30 && lng > 50 && lng < 78) return 'ARABIAN SEA';
+            if (lat > 5 && lat < 28 && lng > 78 && lng < 100) return 'BAY OF BENGAL';
+            if (lat > -5 && lat < 25 && lng > 100 && lng < 125) return 'SOUTH CHINA SEA';
+            if (lat > 20 && lat < 55 && lng > 120 && lng < 155) return 'EAST ASIA';
+            if (lat > 50) return 'RUSSIA / NORTH ASIA';
+            return 'ASIA';
+        }
+
+        // Oceania / Australia
+        if (lat > -50 && lat < 10 && lng > 110 && lng < 180) {
+            if (lat < -10) return 'AUSTRALIA / NZ';
+            return 'OCEANIA';
+        }
+
+        // Oceans (General)
+        if (lat > 0) {
+            if (lng > -80 && lng < 0) return 'NORTH ATLANTIC';
+            if (lng > 120 || lng < -120) return 'NORTH PACIFIC';
+            if (lng > 40 && lng < 110) return 'INDIAN OCEAN';
+        } else {
+            if (lng > -70 && lng < 20) return 'SOUTH ATLANTIC';
+            if (lng > 120 || lng < -100) return 'SOUTH PACIFIC';
+            if (lng > 20 && lng < 115) return 'INDIAN OCEAN';
+        }
+
+        return 'WORLD OVERVIEW';
+    }, []);
+
     useEffect(() => {
         if (onUpdate) {
             const totalRenderedShips = visibleVessels.reduce((acc, v) => acc + v.clusterCount, 0);
+            const center = map.getCenter();
             onUpdate({
                 renderedIcons: visibleVessels.length,
                 totalRenderedShips,
                 trackedShips: trackedCount,
                 trackedVessels: trackedSearchVessels,
+                currentArea: getAreaName(center.lat, center.lng, zoom),
             });
         }
-    }, [visibleVessels, trackedCount, trackedSearchVessels, onUpdate]);
+    }, [visibleVessels, trackedCount, trackedSearchVessels, onUpdate, map, zoom, getAreaName]);
 
     const createVesselIcon = (course: number, isCluster: boolean, isSelected: boolean) => {
         const singleArrow = `
@@ -543,6 +620,7 @@ interface MapDisplayProps {
         totalRenderedShips: number;
         trackedShips: number;
         trackedVessels: Vessel[];
+        currentArea: string;
     }) => void;
     selectedMmsi: number | null;
     onVesselSelect?: (vessel: Vessel | null) => void;

@@ -24,16 +24,16 @@ export default function StatusBar({
     renderedIcons,
     totalRenderedShips,
     trackedShips,
+    currentArea = 'WORLD OVERVIEW',
 }: {
     renderedIcons: number;
     totalRenderedShips: number;
     trackedShips: number;
+    currentArea?: string;
 }) {
     const [systemStatus, setSystemStatus] = useState<ReadyResponse | null>(null);
     const [showDetails, setShowDetails] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
-
-    const currentArea = 'LOCATION PLACEHOLDER';
 
     useEffect(() => {
         const fetchStatus = async () => {

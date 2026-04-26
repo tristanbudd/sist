@@ -13,6 +13,7 @@ export default function MainLayout({
         renderedIcons: number;
         totalRenderedShips: number;
         trackedShips: number;
+        currentArea?: string;
     };
 }>) {
     return (
@@ -40,6 +41,7 @@ export default function MainLayout({
                     renderedIcons={fleetStats?.renderedIcons ?? 0}
                     totalRenderedShips={fleetStats?.totalRenderedShips ?? 0}
                     trackedShips={fleetStats?.trackedShips ?? 0}
+                    currentArea={fleetStats?.currentArea ?? 'WORLD OVERVIEW'}
                 />
             </div>
         </>
