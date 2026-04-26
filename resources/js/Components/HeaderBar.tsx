@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
-import { FaSearch, FaShip, FaAnchor } from 'react-icons/fa';
 import portsGeoJson from '../../data/ports.json';
+import countriesJson from '../../data/countries.json';
 import { Vessel as MapVessel } from './MapDisplay';
+import { FaSearch, FaShip, FaAnchor, FaGlobe } from 'react-icons/fa';
 
 interface Vessel {
     name: string;
@@ -21,7 +22,29 @@ interface Port {
     lon: number;
 }
 
-type SearchResult = Vessel | Port;
+interface Country {
+    category: 'country';
+    name: string;
+    cca2: string;
+    lat: number;
+    lon: number;
+}
+
+interface Continent {
+    category: 'continent';
+    name: string;
+    lat: number;
+    lon: number;
+}
+
+interface Ocean {
+    category: 'ocean';
+    name: string;
+    lat: number;
+    lon: number;
+}
+
+type SearchResult = Vessel | Port | Country | Continent | Ocean;
 
 interface Coordinates {
     lat: number;
@@ -57,6 +80,39 @@ const WORLD_PORTS: Port[] = portsGeoJsonTyped.features.map((feature: PortFeature
     lat: feature.geometry.coordinates[1],
     lon: feature.geometry.coordinates[0],
 }));
+
+interface CountryData {
+    name: string;
+    lat: number;
+    lng: number;
+    cca2: string;
+}
+
+const WORLD_COUNTRIES: Country[] = (countriesJson as CountryData[]).map((c) => ({
+    category: 'country' as const,
+    name: c.name.toUpperCase(),
+    cca2: c.cca2,
+    lat: c.lat,
+    lon: c.lng,
+}));
+
+const WORLD_CONTINENTS: Continent[] = [
+    { category: 'continent', name: 'AFRICA', lat: 1.6508, lon: 17.321 },
+    { category: 'continent', name: 'ANTARCTICA', lat: -75.2509, lon: -0.0713 },
+    { category: 'continent', name: 'ASIA', lat: 34.0479, lon: 100.6197 },
+    { category: 'continent', name: 'EUROPE', lat: 48.3794, lon: 14.5133 },
+    { category: 'continent', name: 'NORTH AMERICA', lat: 46.073, lon: -100.546 },
+    { category: 'continent', name: 'OCEANIA', lat: -25.2744, lon: 133.7751 },
+    { category: 'continent', name: 'SOUTH AMERICA', lat: -15.6006, lon: -56.0721 },
+];
+
+const WORLD_OCEANS: Ocean[] = [
+    { category: 'ocean', name: 'ARCTIC OCEAN', lat: 90, lon: 0 },
+    { category: 'ocean', name: 'ATLANTIC OCEAN', lat: 0, lon: -30 },
+    { category: 'ocean', name: 'INDIAN OCEAN', lat: -20, lon: 80 },
+    { category: 'ocean', name: 'PACIFIC OCEAN', lat: 0, lon: -160 },
+    { category: 'ocean', name: 'SOUTHERN OCEAN', lat: -60, lon: 0 },
+];
 
 const parseVesselCoords = (input: string): Coordinates | null => {
     const q = input.trim();
@@ -111,7 +167,13 @@ export default function HeaderBar({
 }: HeaderBarProps) {
     const [query, setQuery] = useState('');
     const [showSuggestions, setShowSuggestions] = useState(false);
-    const [limit, setLimit] = useState(5);
+    const [categoryLimits, setCategoryLimits] = useState<Record<string, number>>({
+        country: 5,
+        continent: 3,
+        ocean: 3,
+        vessel: 5,
+        port: 5,
+    });
     const [error, setError] = useState<string | null>(null);
     const activeQuery = selectedVesselName ?? query;
 
@@ -124,7 +186,13 @@ export default function HeaderBar({
             lat: v.lat,
             lon: v.lng,
         }));
-        return [...liveVessels, ...WORLD_PORTS];
+        return [
+            ...liveVessels,
+            ...WORLD_PORTS,
+            ...WORLD_COUNTRIES,
+            ...WORLD_CONTINENTS,
+            ...WORLD_OCEANS,
+        ];
     }, [vessels]);
 
     const suggestions = useMemo(() => {
@@ -139,22 +207,34 @@ export default function HeaderBar({
                     item.imo.includes(q)
                 );
             }
-            return (
-                item.name.toUpperCase().includes(q) ||
-                (item.code && item.code.toUpperCase().includes(q)) ||
-                (item.country && item.country.toUpperCase().includes(q))
-            );
+            if (item.category === 'port') {
+                return (
+                    item.name.toUpperCase().includes(q) ||
+                    (item.code && item.code.toUpperCase().includes(q)) ||
+                    (item.country && item.country.toUpperCase().includes(q))
+                );
+            }
+            if (item.category === 'country') {
+                return item.name.toUpperCase().includes(q) || item.cca2.toUpperCase().includes(q);
+            }
+            return item.name.toUpperCase().includes(q);
         });
 
         return matches.sort((a, b) => {
             if (a.category !== b.category) {
-                return a.category === 'vessel' ? -1 : 1;
+                const priority: Record<string, number> = {
+                    country: 0,
+                    continent: 1,
+                    ocean: 2,
+                    vessel: 3,
+                    port: 4,
+                };
+                return priority[a.category] - priority[b.category];
             }
             return a.name.localeCompare(b.name);
         });
     }, [activeQuery, allResults]);
 
-    const displayedSuggestions = useMemo(() => suggestions.slice(0, limit), [suggestions, limit]);
     const showSuggestionsPanel = showSuggestions && !error && suggestions.length > 0;
 
     const handleSelect = (item: SearchResult) => {
@@ -167,12 +247,22 @@ export default function HeaderBar({
         }
 
         if (onNavigate) {
-            onNavigate(item.lat, item.lon, 14);
+            let zoom = 14;
+            if (item.category === 'country') zoom = 6;
+            if (item.category === 'continent') zoom = 3;
+            if (item.category === 'ocean') zoom = 3;
+            onNavigate(item.lat, item.lon, zoom);
         }
 
         setQuery(item.name);
         setShowSuggestions(false);
-        setLimit(5);
+        setCategoryLimits({
+            country: 5,
+            continent: 3,
+            ocean: 3,
+            vessel: 5,
+            port: 5,
+        });
         setError(null);
     };
 
@@ -202,7 +292,13 @@ export default function HeaderBar({
                 if (item.category === 'vessel') {
                     return item.name === upperQ || item.mmsi === upperQ || item.imo === upperQ;
                 }
-                return item.name === upperQ || item.code === upperQ;
+                if (item.category === 'port') {
+                    return item.name === upperQ || item.code === upperQ;
+                }
+                if (item.category === 'country') {
+                    return item.name === upperQ || item.cca2 === upperQ;
+                }
+                return item.name === upperQ;
             });
 
             if (exactMatch) {
@@ -245,7 +341,13 @@ export default function HeaderBar({
                                 onSelectVessel(null);
                             }
                             setQuery(e.target.value);
-                            setLimit(5);
+                            setCategoryLimits({
+                                country: 5,
+                                continent: 3,
+                                ocean: 3,
+                                vessel: 5,
+                                port: 5,
+                            });
                             setError(null);
                             setShowSuggestions(true);
                         }}
@@ -274,86 +376,91 @@ export default function HeaderBar({
                             </div>
                         )}
 
-                        {displayedSuggestions.some((i) => i.category === 'vessel') && (
-                            <div className="px-4 py-2 bg-zinc-900/30 border-b border-white/5">
-                                <span className="text-[8px] font-black text-white/40 uppercase tracking-[0.25em]">
-                                    Vessels
-                                </span>
-                            </div>
-                        )}
-                        {displayedSuggestions
-                            .filter((i): i is Vessel => i.category === 'vessel')
-                            .map((item, idx) => (
-                                <button
-                                    key={`vessel-${item.mmsi}-${idx}`}
-                                    onClick={() => handleSelect(item)}
-                                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-none text-left"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <FaShip className="text-zinc-500 w-3 h-3" />
-                                        <div className="flex flex-col">
-                                            <span className="text-white text-[11px] font-bold">
-                                                {item.name}
-                                            </span>
-                                            <span className="text-zinc-500 text-[9px] font-mono">
-                                                MMSI: {item.mmsi} | IMO: {item.imo || 'Unknown'}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </button>
-                            ))}
+                        {['country', 'continent', 'ocean', 'vessel', 'port'].map((cat) => {
+                            const catItems = suggestions.filter((i) => i.category === cat);
+                            if (catItems.length === 0) return null;
 
-                        {displayedSuggestions.some((i) => i.category === 'port') && (
-                            <div
-                                className={`px-4 py-2 bg-zinc-900/30 border-b border-white/5 ${displayedSuggestions.some((i) => i.category === 'vessel') ? 'mt-2' : ''}`}
-                            >
-                                <span className="text-[8px] font-black text-white/40 uppercase tracking-[0.25em]">
-                                    Ports
-                                </span>
-                            </div>
-                        )}
-                        {displayedSuggestions
-                            .filter((i): i is Port => i.category === 'port')
-                            .map((item, idx) => (
-                                <button
-                                    key={`port-${item.code}-${idx}`}
-                                    onClick={() => handleSelect(item)}
-                                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-none text-left"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <FaAnchor className="text-zinc-500 w-3 h-3" />
-                                        <div className="flex flex-col">
-                                            <span className="text-white text-[11px] font-bold">
-                                                {item.name}
+                            const displayed = catItems.slice(0, categoryLimits[cat]);
+                            const label =
+                                cat === 'vessel'
+                                    ? 'Vessels'
+                                    : cat === 'port'
+                                      ? 'Ports'
+                                      : cat === 'country'
+                                        ? 'Countries'
+                                        : cat === 'continent'
+                                          ? 'Continents'
+                                          : 'Oceans';
+                            const Icon =
+                                cat === 'vessel' ? FaShip : cat === 'port' ? FaAnchor : FaGlobe;
+
+                            return (
+                                <div key={cat}>
+                                    <div
+                                        className={`px-4 py-2 bg-zinc-900/30 border-b border-white/5 ${cat !== 'country' ? 'mt-2' : ''}`}
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[8px] font-black text-white/40 uppercase tracking-[0.25em]">
+                                                {label}
                                             </span>
-                                            <span className="text-zinc-500 text-[9px] font-mono">
-                                                CODE: {item.code} | {item.country}
+                                            <span className="text-[7px] text-zinc-600 font-bold uppercase tracking-widest">
+                                                {catItems.length.toLocaleString()} found
                                             </span>
                                         </div>
                                     </div>
-                                </button>
-                            ))}
+                                    {displayed.map((item, idx) => (
+                                        <button
+                                            key={`${cat}-${idx}`}
+                                            onClick={() => handleSelect(item)}
+                                            className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-none text-left"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <Icon className="text-zinc-500 w-3 h-3" />
+                                                <div className="flex flex-col">
+                                                    <span className="text-white text-[11px] font-bold">
+                                                        {item.name}
+                                                    </span>
+                                                    <span className="text-zinc-500 text-[9px] font-mono uppercase">
+                                                        {cat === 'vessel'
+                                                            ? `MMSI: ${(item as Vessel).mmsi} | IMO: ${(item as Vessel).imo || 'Unknown'}`
+                                                            : cat === 'port'
+                                                              ? `CODE: ${(item as Port).code} | ${(item as Port).country}`
+                                                              : cat === 'country'
+                                                                ? `ISO: ${(item as Country).cca2}`
+                                                                : cat === 'continent'
+                                                                  ? 'Region'
+                                                                  : 'Water Body'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </button>
+                                    ))}
+                                    {catItems.length > categoryLimits[cat] && (
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setCategoryLimits((prev) => ({
+                                                    ...prev,
+                                                    [cat]: prev[cat] + 5,
+                                                }));
+                                            }}
+                                            className="w-full py-2 bg-white/2 hover:bg-white/5 text-[9px] text-zinc-400 hover:text-white font-bold uppercase tracking-widest transition-colors border-b border-white/5"
+                                        >
+                                            Show more {label}
+                                        </button>
+                                    )}
+                                </div>
+                            );
+                        })}
 
                         <div className="flex flex-col gap-2 px-4 py-2 bg-white/2 border-t border-white/5">
-                            <div className="flex items-center justify-between">
-                                <span className="text-[9px] text-zinc-500 font-medium">
-                                    Showing {displayedSuggestions.length} of {suggestions.length}{' '}
-                                    found
+                            <div className="flex items-center justify-center">
+                                <span className="text-[9px] text-zinc-600 font-medium">
+                                    Total search results: {suggestions.length.toLocaleString()}
                                 </span>
-                                {suggestions.length > limit && (
-                                    <button
-                                        type="button"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setLimit((prev) => prev + 5);
-                                        }}
-                                        className="text-[9px] text-zinc-300 hover:text-white font-bold uppercase tracking-wider px-2 py-1"
-                                    >
-                                        Show more
-                                    </button>
-                                )}
                             </div>
-                            {displayedSuggestions.some((i) => i.category === 'port') && (
+                            {suggestions.some((i) => i.category === 'port') && (
                                 <div className="text-[7px] text-zinc-600 uppercase tracking-widest text-center border-t border-white/5 pt-2 pb-0">
                                     Port Data:{' '}
                                     <a
