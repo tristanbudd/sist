@@ -924,7 +924,7 @@ export default function MapDisplay({
     onClusterZoomNotice,
 }: MapDisplayProps) {
     const [showVessels, setShowVessels] = useState(true);
-    const [showPorts, setShowPorts] = useState(true);
+    const [showPorts, setShowPorts] = useState(false);
     const [showCities, setShowCities] = useState(false);
 
     return (
