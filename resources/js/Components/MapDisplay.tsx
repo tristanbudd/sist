@@ -743,9 +743,17 @@ function LayerControl({
             {isOpen && (
                 <div className="bg-zinc-950 border border-white/20 p-4 shadow-2xl flex flex-col gap-4 min-w-[200px] animate-in slide-in-from-bottom-2 duration-200">
                     <div className="flex flex-col gap-3">
-                        <span className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] border-b border-white/10 pb-2">
-                            Map Layers
-                        </span>
+                        <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                            <span className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em]">
+                                Map Layers
+                            </span>
+                            <button
+                                onClick={() => setIsOpen(false)}
+                                className="text-zinc-500 hover:text-white transition-colors w-5 h-5 flex items-center justify-center rounded hover:bg-white/10"
+                            >
+                                <FaXmark className="w-3 h-3" />
+                            </button>
+                        </div>
                         <div className="flex flex-col gap-2">
                             <button
                                 onClick={() => setShowVessels(!showVessels)}

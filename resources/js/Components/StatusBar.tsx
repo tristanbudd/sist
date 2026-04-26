@@ -150,9 +150,9 @@ export default function StatusBar({
                         </button>
 
                         {showDetails && systemStatus && (
-                            <div className="absolute bottom-full right-0 mb-2 bg-zinc-900 border border-zinc-800 rounded-lg shadow-2xl p-4 w-80 sm:w-96 backdrop-blur-xl">
+                            <div className="absolute bottom-full right-0 mb-2 bg-zinc-950 border border-white/20 shadow-2xl p-4 w-80 sm:w-96 animate-in slide-in-from-bottom-2 duration-200">
                                 <div className="space-y-3">
-                                    <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+                                    <div className="flex items-center justify-between pb-3 border-b border-white/10">
                                         <div>
                                             <div className="font-semibold text-zinc-100 text-sm">
                                                 System Health
@@ -163,7 +163,7 @@ export default function StatusBar({
                                         </div>
                                         <button
                                             onClick={() => setShowDetails(false)}
-                                            className="text-zinc-500 hover:text-zinc-300 transition-colors w-6 h-6 flex items-center justify-center rounded hover:bg-zinc-800"
+                                            className="text-zinc-500 hover:text-white transition-colors w-5 h-5 flex items-center justify-center rounded hover:bg-white/10"
                                         >
                                             ✕
                                         </button>
@@ -246,7 +246,7 @@ function StatusDetail({ name, status, latency, message, lastMessageAge }: Status
     const isOk = status === 'ok';
 
     return (
-        <div className="flex items-center justify-between py-2.5 px-3 rounded-md bg-zinc-950/50 border border-zinc-800/50">
+        <div className="flex items-center justify-between py-2.5 px-3 bg-zinc-900/30 border border-white/5">
             <div className="flex items-center gap-3">
                 <div
                     className={`w-2 h-2 rounded-full ${isOk ? 'bg-emerald-500' : 'bg-red-500'} ring-2 ${isOk ? 'ring-emerald-500/20' : 'ring-red-500/20'}`}
