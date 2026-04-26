@@ -119,6 +119,7 @@ function FleetLayer({
             setZoom(currentZoom);
 
             try {
+                // TODO: Change to relative path once finished with dev
                 const response = await axios.get('https://sist.tristanbudd.com/api/vessels', {
                     signal: controller.signal,
                     params: {
@@ -158,6 +159,7 @@ function FleetLayer({
 
         try {
             while (hasMore) {
+                // TODO: Change to relative path once finished with dev
                 const response = await axios.get('https://sist.tristanbudd.com/api/vessels', {
                     params: {
                         age_minutes: 60,
