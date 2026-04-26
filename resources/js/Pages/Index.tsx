@@ -30,8 +30,8 @@ export default function Index() {
     const [showClusterZoomNotice, setShowClusterZoomNotice] = useState(false);
     const clusterZoomNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const handleNavigate = useCallback((lat: number, lon: number, zoom: number = 12) => {
-        setMapViewState({ center: [lat, lon], zoom });
+    const handleNavigate = useCallback((lat: number, lng: number, zoom: number = 12) => {
+        setMapViewState({ center: [lat, lng], zoom });
     }, []);
 
     const handleFleetUpdate = useCallback((stats: FleetStats) => {

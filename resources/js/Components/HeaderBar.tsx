@@ -11,7 +11,7 @@ interface Vessel {
     imo: string;
     category: 'vessel';
     lat: number;
-    lon: number;
+    lng: number;
 }
 
 interface Port {
@@ -20,7 +20,7 @@ interface Port {
     code: string;
     country: string;
     lat: number;
-    lon: number;
+    lng: number;
 }
 
 interface Country {
@@ -28,21 +28,21 @@ interface Country {
     name: string;
     cca2: string;
     lat: number;
-    lon: number;
+    lng: number;
 }
 
 interface Continent {
     category: 'continent';
     name: string;
     lat: number;
-    lon: number;
+    lng: number;
 }
 
 interface Ocean {
     category: 'ocean';
     name: string;
     lat: number;
-    lon: number;
+    lng: number;
 }
 
 interface City {
@@ -51,44 +51,39 @@ interface City {
     country: string;
     iso: string;
     lat: number;
-    lon: number;
+    lng: number;
 }
 
 type SearchResult = Vessel | Port | Country | Continent | Ocean | City;
 
 interface Coordinates {
     lat: number;
-    lon: number;
+    lng: number;
 }
 
 interface HeaderBarProps {
-    onNavigate?: (lat: number, lon: number, zoom: number) => void;
+    onNavigate?: (lat: number, lng: number, zoom: number) => void;
     vessels?: MapVessel[];
     onSelectVessel?: (vessel: MapVessel | null) => void;
     selectedVesselName?: string;
     showClusterZoomNotice?: boolean;
 }
 
-interface PortFeature {
-    properties: {
-        Name: string;
-        LOCODE: string;
-        Country: string;
-    };
-    geometry: {
-        coordinates: [number, number];
-    };
+interface PortData {
+    name: string;
+    country: string;
+    code: string;
+    lat: number;
+    lng: number;
 }
 
-const portsGeoJsonTyped = portsGeoJson as unknown as { features: PortFeature[] };
-
-const WORLD_PORTS: Port[] = portsGeoJsonTyped.features.map((feature: PortFeature) => ({
+const WORLD_PORTS: Port[] = (portsGeoJson as PortData[]).map((p) => ({
     category: 'port' as const,
-    name: feature.properties.Name.toUpperCase(),
-    code: feature.properties.LOCODE,
-    country: feature.properties.Country,
-    lat: feature.geometry.coordinates[1],
-    lon: feature.geometry.coordinates[0],
+    name: p.name.toUpperCase(),
+    code: p.code,
+    country: p.country,
+    lat: p.lat,
+    lng: p.lng,
 }));
 
 interface CountryData {
@@ -103,7 +98,7 @@ const WORLD_COUNTRIES: Country[] = (countriesJson as CountryData[]).map((c) => (
     name: c.name.toUpperCase(),
     cca2: c.cca2,
     lat: c.lat,
-    lon: c.lng,
+    lng: c.lng,
 }));
 
 const COUNTRY_LOOKUP: Record<string, string> = (countriesJson as CountryData[]).reduce(
@@ -115,26 +110,26 @@ const COUNTRY_LOOKUP: Record<string, string> = (countriesJson as CountryData[]).
 );
 
 const WORLD_CONTINENTS: Continent[] = [
-    { category: 'continent', name: 'AFRICA', lat: 1.6508, lon: 17.321 },
-    { category: 'continent', name: 'ANTARCTICA', lat: -75.2509, lon: -0.0713 },
-    { category: 'continent', name: 'ASIA', lat: 34.0479, lon: 100.6197 },
-    { category: 'continent', name: 'EUROPE', lat: 48.3794, lon: 14.5133 },
-    { category: 'continent', name: 'NORTH AMERICA', lat: 46.073, lon: -100.546 },
-    { category: 'continent', name: 'OCEANIA', lat: -25.2744, lon: 133.7751 },
-    { category: 'continent', name: 'SOUTH AMERICA', lat: -15.6006, lon: -56.0721 },
+    { category: 'continent', name: 'AFRICA', lat: 1.6508, lng: 17.321 },
+    { category: 'continent', name: 'ANTARCTICA', lat: -75.2509, lng: -0.0713 },
+    { category: 'continent', name: 'ASIA', lat: 34.0479, lng: 100.6197 },
+    { category: 'continent', name: 'EUROPE', lat: 48.3794, lng: 14.5133 },
+    { category: 'continent', name: 'NORTH AMERICA', lat: 46.073, lng: -100.546 },
+    { category: 'continent', name: 'OCEANIA', lat: -25.2744, lng: 133.7751 },
+    { category: 'continent', name: 'SOUTH AMERICA', lat: -15.6006, lng: -56.0721 },
 ];
 
 const WORLD_OCEANS: Ocean[] = [
-    { category: 'ocean', name: 'ARCTIC OCEAN', lat: 90, lon: 0 },
-    { category: 'ocean', name: 'ATLANTIC OCEAN', lat: 0, lon: -30 },
-    { category: 'ocean', name: 'INDIAN OCEAN', lat: -20, lon: 80 },
-    { category: 'ocean', name: 'PACIFIC OCEAN', lat: 0, lon: -160 },
-    { category: 'ocean', name: 'SOUTHERN OCEAN', lat: -60, lon: 0 },
+    { category: 'ocean', name: 'ARCTIC OCEAN', lat: 90, lng: 0 },
+    { category: 'ocean', name: 'ATLANTIC OCEAN', lat: 0, lng: -30 },
+    { category: 'ocean', name: 'INDIAN OCEAN', lat: -20, lng: 80 },
+    { category: 'ocean', name: 'PACIFIC OCEAN', lat: 0, lng: -160 },
+    { category: 'ocean', name: 'SOUTHERN OCEAN', lat: -60, lng: 0 },
 ];
 interface RawCityData {
     name: string;
     lat: number;
-    lon: number;
+    lng: number;
     country: string;
 }
 
@@ -144,22 +139,22 @@ const WORLD_CITIES: City[] = (citiesJson as RawCityData[]).map((c) => ({
     country: COUNTRY_LOOKUP[c.country] || c.country,
     iso: c.country,
     lat: c.lat,
-    lon: c.lon,
+    lng: c.lng,
 }));
 
 const parseVesselCoords = (input: string): Coordinates | null => {
     const q = input.trim();
 
     const stdDD = q.match(/^([-+]?\d{1,2}(?:\.\d+)?),\s*([-+]?\d{1,3}(?:\.\d+)?)$/);
-    if (stdDD) return { lat: parseFloat(stdDD[1]), lon: parseFloat(stdDD[2]) };
+    if (stdDD) return { lat: parseFloat(stdDD[1]), lng: parseFloat(stdDD[2]) };
 
     const hemiDD = q.match(/^(\d+(?:\.\d+)?)°?\s*([NSns]),?\s*(\d+(?:\.\d+)?)°?\s*([EWew])$/);
     if (hemiDD) {
         let lat = parseFloat(hemiDD[1]);
-        let lon = parseFloat(hemiDD[3]);
+        let lng = parseFloat(hemiDD[3]);
         if (hemiDD[2].toUpperCase() === 'S') lat *= -1;
-        if (hemiDD[4].toUpperCase() === 'W') lon *= -1;
-        return { lat, lon };
+        if (hemiDD[4].toUpperCase() === 'W') lng *= -1;
+        return { lat, lng };
     }
 
     const dms = q.match(
@@ -180,12 +175,12 @@ const parseVesselCoords = (input: string): Coordinates | null => {
         ];
 
         let lat = d1 + m1 / 60 + s1 / 3600;
-        let lon = d2 + m2 / 60 + s2 / 3600;
+        let lng = d2 + m2 / 60 + s2 / 3600;
 
         if (h1 === 'S') lat *= -1;
-        if (h2 === 'W') lon *= -1;
+        if (h2 === 'W') lng *= -1;
 
-        return { lat, lon };
+        return { lat, lng };
     }
 
     return null;
@@ -218,7 +213,7 @@ export default function HeaderBar({
             mmsi: String(v.mmsi),
             imo: String(v.imo || ''),
             lat: v.lat,
-            lon: v.lng,
+            lng: v.lng,
         }));
         return [
             ...liveVessels,
@@ -294,7 +289,7 @@ export default function HeaderBar({
             if (item.category === 'continent') zoom = 3;
             if (item.category === 'ocean') zoom = 3;
             if (item.category === 'city') zoom = 11;
-            onNavigate(item.lat, item.lon, zoom);
+            onNavigate(item.lat, item.lng, zoom);
         }
 
         setQuery(item.name);
@@ -316,14 +311,14 @@ export default function HeaderBar({
             const coords = parseVesselCoords(q);
 
             if (coords) {
-                const { lat, lon } = coords;
-                if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+                const { lat, lng } = coords;
+                if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
                     setError('Invalid coordinates: Values outside Earth boundaries');
                     return;
                 }
 
                 if (onNavigate) {
-                    onNavigate(lat, lon, 12);
+                    onNavigate(lat, lng, 12);
                 }
 
                 setError(null);
@@ -434,7 +429,7 @@ export default function HeaderBar({
                                       : cat === 'country'
                                         ? 'Countries'
                                         : cat === 'city'
-                                          ? 'Cities'
+                                          ? 'Cities / Towns'
                                           : cat === 'continent'
                                             ? 'Continents'
                                             : 'Oceans';

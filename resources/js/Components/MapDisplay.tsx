@@ -29,7 +29,14 @@ const MAX_BOUNDS: L.LatLngBoundsExpression = [
     [90, 180],
 ];
 
-const COUNTRY_NAMES: Record<string, string> = (countriesData as any[]).reduce(
+interface Country {
+    name: string;
+    lat: number;
+    lng: number;
+    cca2: string;
+}
+
+const COUNTRY_NAMES: Record<string, string> = (countriesData as Country[]).reduce(
     (acc, c) => {
         acc[c.cca2] = c.name;
         return acc;
@@ -503,21 +510,12 @@ function FleetLayer({
     );
 }
 
-interface PortFeature {
-    type: string;
-    properties: {
-        Country: string;
-        Function: string;
-        LOCODE: string;
-        Name: string;
-        NameWoDiac: string;
-        Status: string;
-        outflows: number;
-    };
-    geometry: {
-        type: string;
-        coordinates: [number, number];
-    };
+interface Port {
+    name: string;
+    country: string;
+    code: string;
+    lat: number;
+    lng: number;
 }
 
 function PortLayer() {
@@ -536,24 +534,18 @@ function PortLayer() {
     const visiblePorts = useMemo(() => {
         if (zoom < 6) return [];
 
-        const portsDataTyped = portsData as unknown as { features: PortFeature[] };
-        const filtered: PortFeature[] = [];
+        const ports = portsData as unknown as Port[];
+        const filtered: Port[] = [];
         const minDistancePx = zoom < 7 ? 25 : zoom < 10 ? 15 : 0;
 
-        portsDataTyped.features.forEach((port) => {
-            const lat = port.geometry.coordinates[1];
-            const lng = port.geometry.coordinates[0];
+        ports.forEach((port) => {
+            if (!bounds.contains([port.lat, port.lng])) return;
 
-            if (!bounds.contains([lat, lng])) return;
-
-            const pos = map.latLngToLayerPoint([lat, lng]);
+            const pos = map.latLngToLayerPoint([port.lat, port.lng]);
             const tooClose =
                 minDistancePx > 0 &&
                 filtered.some((f) => {
-                    const fPos = map.latLngToLayerPoint([
-                        f.geometry.coordinates[1],
-                        f.geometry.coordinates[0],
-                    ]);
+                    const fPos = map.latLngToLayerPoint([f.lat, f.lng]);
                     const dist = Math.sqrt(
                         Math.pow(pos.x - fPos.x, 2) + Math.pow(pos.y - fPos.y, 2)
                     );
@@ -583,17 +575,17 @@ function PortLayer() {
 
     return (
         <>
-            {visiblePorts.map((port: PortFeature, idx: number) => (
+            {visiblePorts.map((port: Port, idx: number) => (
                 <Marker
-                    key={`port-${port.properties.LOCODE}-${idx}`}
-                    position={[port.geometry.coordinates[1], port.geometry.coordinates[0]]}
+                    key={`port-${port.code}-${idx}`}
+                    position={[port.lat, port.lng]}
                     icon={portIcon}
                 >
                     <Popup closeButton={false} minWidth={200}>
                         <div className="bg-zinc-950 border border-white/20 shadow-2xl p-4 min-w-[200px]">
                             <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-2 mb-2">
                                 <span className="font-bold text-xs uppercase tracking-wider text-cyan-400 truncate">
-                                    {port.properties.Name}
+                                    {port.name}
                                 </span>
                                 <button
                                     onClick={(e) => {
@@ -606,10 +598,10 @@ function PortLayer() {
                                 </button>
                             </div>
                             <div className="text-[10px] text-zinc-400 uppercase font-bold tracking-tight">
-                                {port.properties.Country}
+                                {port.country}
                             </div>
                             <div className="text-[9px] text-zinc-500 font-mono mt-1 opacity-60">
-                                {port.properties.LOCODE}
+                                {port.code}
                             </div>
                         </div>
                     </Popup>
@@ -623,7 +615,7 @@ interface City {
     name: string;
     country: string;
     lat: number;
-    lon: number;
+    lng: number;
 }
 
 function CityLayer() {
@@ -654,16 +646,16 @@ function CityLayer() {
             if (
                 city.lat < bounds.getSouth() ||
                 city.lat > bounds.getNorth() ||
-                city.lon < bounds.getWest() ||
-                city.lon > bounds.getEast()
+                city.lng < bounds.getWest() ||
+                city.lng > bounds.getEast()
             ) {
                 continue;
             }
 
             if (minDistancePx > 0) {
-                const pos = map.latLngToLayerPoint([city.lat, city.lon]);
+                const pos = map.latLngToLayerPoint([city.lat, city.lng]);
                 const tooClose = filtered.some((f) => {
-                    const fPos = map.latLngToLayerPoint([f.lat, f.lon]);
+                    const fPos = map.latLngToLayerPoint([f.lat, f.lng]);
                     const distSq = Math.pow(pos.x - fPos.x, 2) + Math.pow(pos.y - fPos.y, 2);
                     return distSq < minDistancePx * minDistancePx;
                 });
@@ -696,7 +688,7 @@ function CityLayer() {
             {visibleCities.map((city: City, idx: number) => (
                 <Marker
                     key={`city-${city.name}-${idx}`}
-                    position={[city.lat, city.lon]}
+                    position={[city.lat, city.lng]}
                     icon={cityIcon}
                 >
                     <Popup closeButton={false} minWidth={150}>
@@ -798,7 +790,7 @@ function LayerControl({
                                 <span
                                     className={`text-[11px] font-bold uppercase tracking-wider transition-colors ${showCities ? 'text-white' : 'text-zinc-600'}`}
                                 >
-                                    Cities
+                                    Cities / Towns
                                 </span>
                                 <div
                                     className={`w-8 h-4 border transition-colors relative ${showCities ? 'bg-white border-white' : 'border-zinc-800 bg-transparent'}`}
@@ -846,7 +838,7 @@ function LayerControl({
                                     <FaCity className="w-2.5 h-2.5 text-green-500" />
                                 </div>
                                 <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-tight">
-                                    Major City
+                                    City / Town
                                 </span>
                             </div>
                         </div>
