@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
 import portsGeoJson from '../../data/ports.json';
 import countriesJson from '../../data/countries.json';
+import citiesJson from '../../data/cities.json';
 import { Vessel as MapVessel } from './MapDisplay';
-import { FaSearch, FaShip, FaAnchor, FaGlobe } from 'react-icons/fa';
+import { FaSearch, FaShip, FaAnchor, FaGlobe, FaCity } from 'react-icons/fa';
 
 interface Vessel {
     name: string;
@@ -44,7 +45,15 @@ interface Ocean {
     lon: number;
 }
 
-type SearchResult = Vessel | Port | Country | Continent | Ocean;
+interface City {
+    category: 'city';
+    name: string;
+    country: string;
+    lat: number;
+    lon: number;
+}
+
+type SearchResult = Vessel | Port | Country | Continent | Ocean | City;
 
 interface Coordinates {
     lat: number;
@@ -114,6 +123,14 @@ const WORLD_OCEANS: Ocean[] = [
     { category: 'ocean', name: 'SOUTHERN OCEAN', lat: -60, lon: 0 },
 ];
 
+const WORLD_CITIES: City[] = (citiesJson as any[]).map((c) => ({
+    category: 'city' as const,
+    name: c.name.toUpperCase(),
+    country: c.country,
+    lat: c.lat,
+    lon: c.lon,
+}));
+
 const parseVesselCoords = (input: string): Coordinates | null => {
     const q = input.trim();
 
@@ -173,6 +190,7 @@ export default function HeaderBar({
         ocean: 3,
         vessel: 5,
         port: 5,
+        city: 5,
     });
     const [error, setError] = useState<string | null>(null);
     const activeQuery = selectedVesselName ?? query;
@@ -190,6 +208,7 @@ export default function HeaderBar({
             ...liveVessels,
             ...WORLD_PORTS,
             ...WORLD_COUNTRIES,
+            ...WORLD_CITIES,
             ...WORLD_CONTINENTS,
             ...WORLD_OCEANS,
         ];
@@ -217,6 +236,12 @@ export default function HeaderBar({
             if (item.category === 'country') {
                 return item.name.toUpperCase().includes(q) || item.cca2.toUpperCase().includes(q);
             }
+            if (item.category === 'city') {
+                return (
+                    item.name.toUpperCase().includes(q) ||
+                    (item.country && item.country.toUpperCase().includes(q))
+                );
+            }
             return item.name.toUpperCase().includes(q);
         });
 
@@ -226,8 +251,9 @@ export default function HeaderBar({
                     country: 0,
                     continent: 1,
                     ocean: 2,
-                    vessel: 3,
-                    port: 4,
+                    city: 3,
+                    vessel: 4,
+                    port: 5,
                 };
                 return priority[a.category] - priority[b.category];
             }
@@ -251,6 +277,7 @@ export default function HeaderBar({
             if (item.category === 'country') zoom = 6;
             if (item.category === 'continent') zoom = 3;
             if (item.category === 'ocean') zoom = 3;
+            if (item.category === 'city') zoom = 11;
             onNavigate(item.lat, item.lon, zoom);
         }
 
@@ -262,6 +289,7 @@ export default function HeaderBar({
             ocean: 3,
             vessel: 5,
             port: 5,
+            city: 5,
         });
         setError(null);
     };
@@ -347,6 +375,7 @@ export default function HeaderBar({
                                 ocean: 3,
                                 vessel: 5,
                                 port: 5,
+                                city: 5,
                             });
                             setError(null);
                             setShowSuggestions(true);
@@ -376,7 +405,7 @@ export default function HeaderBar({
                             </div>
                         )}
 
-                        {['country', 'continent', 'ocean', 'vessel', 'port'].map((cat) => {
+                        {['country', 'city', 'continent', 'ocean', 'vessel', 'port'].map((cat) => {
                             const catItems = suggestions.filter((i) => i.category === cat);
                             if (catItems.length === 0) return null;
 
@@ -388,11 +417,19 @@ export default function HeaderBar({
                                       ? 'Ports'
                                       : cat === 'country'
                                         ? 'Countries'
-                                        : cat === 'continent'
-                                          ? 'Continents'
-                                          : 'Oceans';
+                                        : cat === 'city'
+                                          ? 'Cities'
+                                          : cat === 'continent'
+                                            ? 'Continents'
+                                            : 'Oceans';
                             const Icon =
-                                cat === 'vessel' ? FaShip : cat === 'port' ? FaAnchor : FaGlobe;
+                                cat === 'vessel'
+                                    ? FaShip
+                                    : cat === 'port'
+                                      ? FaAnchor
+                                      : cat === 'city'
+                                        ? FaCity
+                                        : FaGlobe;
 
                             return (
                                 <div key={cat}>
@@ -427,9 +464,11 @@ export default function HeaderBar({
                                                               ? `CODE: ${(item as Port).code} | ${(item as Port).country}`
                                                               : cat === 'country'
                                                                 ? `ISO: ${(item as Country).cca2}`
-                                                                : cat === 'continent'
-                                                                  ? 'Region'
-                                                                  : 'Water Body'}
+                                                                : cat === 'city'
+                                                                  ? `COUNTRY: ${(item as City).country}`
+                                                                  : cat === 'continent'
+                                                                    ? 'Region'
+                                                                    : 'Water Body'}
                                                     </span>
                                                 </div>
                                             </div>
