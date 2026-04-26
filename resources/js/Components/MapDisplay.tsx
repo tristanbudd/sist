@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { renderToString } from 'react-dom/server';
 import { MapContainer, TileLayer, useMap, Marker, Popup, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import {
@@ -400,26 +401,55 @@ function FleetLayer({
     const createVesselIcon = (course: number, isCluster: boolean, isSelected: boolean) => {
         const color = isSelected ? '#ef4444' : 'white';
         const shadowColor = isSelected ? 'rgba(239, 68, 68, 0.4)' : 'rgba(255, 255, 255, 0.4)';
-        const arrowPath = 'M12 2L4.5 20.29L5.21 21L12 18L18.79 21L19.5 20.29L12 2Z';
 
-        const singleIcon = `
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="${color}" stroke="black" stroke-width="1">
-                <path d="${arrowPath}" />
-            </svg>
-        `;
+        const singleIconHtml = renderToString(
+            <FaLocationArrow
+                style={{
+                    color,
+                    width: '16px',
+                    height: '16px',
+                    transform: 'rotate(-45deg)',
+                    filter: 'drop-shadow(0 0 1px black)',
+                }}
+            />
+        );
 
-        const clusterIcon = `
-            <svg width="22" height="22" viewBox="0 0 24 24" style="position: relative;">
-                <path d="${arrowPath}" fill="${shadowColor}" stroke="black" stroke-width="1" style="transform: translate(2px, 2px);" />
-                <path d="${arrowPath}" fill="${color}" stroke="black" stroke-width="1" />
-            </svg>
-        `;
+        const clusterIconHtml = renderToString(
+            <div
+                style={{ position: 'relative', width: '22px', height: '22px', overflow: 'visible' }}
+            >
+                <FaLocationArrow
+                    style={{
+                        color,
+                        width: '18px',
+                        height: '18px',
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        transform: 'rotate(-45deg)',
+                        filter: 'drop-shadow(0 0 1px black)',
+                    }}
+                />
+                <FaLocationArrow
+                    style={{
+                        color: shadowColor,
+                        width: '14px',
+                        height: '14px',
+                        position: 'absolute',
+                        top: '6px',
+                        left: '6px',
+                        transform: 'rotate(-45deg)',
+                        filter: 'drop-shadow(0 0 1px black)',
+                    }}
+                />
+            </div>
+        );
 
         return L.divIcon({
             className: 'vessel-icon-container',
             html: `
                 <div style="transform: rotate(${course}deg); display: flex; align-items: center; justify-content: center;">
-                    ${isCluster ? clusterIcon : singleIcon}
+                    ${isCluster ? clusterIconHtml : singleIconHtml}
                 </div>
             `,
             iconSize: [22, 22],
@@ -562,13 +592,19 @@ function PortLayer() {
 
     const portIcon = L.divIcon({
         className: 'port-icon-container',
-        html: `
-            <div style="display: flex; align-items: center; justify-content: center; color: #22d3ee; filter: drop-shadow(0 0 2px rgba(0,0,0,0.5));">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 2a3 3 0 0 1 3 3 3 3 0 0 1-3 3 3 3 0 0 1-3-3 3 3 0 0 1 3-3m0 2a1 1 0 0 0-1 1 1 1 0 0 0 1 1 1 1 0 0 0 1-1 1 1 0 0 0-1-1m7 12h-2c0-2.76-2.24-5-5-5s-5 2.24-5 5H5c0-3.53 2.61-6.43 6-6.92V8h2v1.08c3.39.49 6 3.39 6 6.92m-7 6c-3.87 0-7-3.13-7-7h2a5 5 0 0 0 5 5 5 5 0 0 0 5-5h2c0 3.87-3.13 7-7 7z"/>
-                </svg>
+        html: renderToString(
+            <div
+                style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#22d3ee',
+                    filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.5))',
+                }}
+            >
+                <FaAnchor style={{ width: '14px', height: '14px' }} />
             </div>
-        `,
+        ),
         iconSize: [14, 14],
         iconAnchor: [7, 7],
     });
@@ -672,13 +708,19 @@ function CityLayer() {
 
     const cityIcon = L.divIcon({
         className: 'city-icon-container',
-        html: `
-            <div style="display: flex; align-items: center; justify-content: center; color: #22c55e; filter: drop-shadow(0 0 2px rgba(0,0,0,0.5));">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M15 11V5l-3-3-3 3v2H3v14h18V11h-6zm-8 8H5v-2h2v2zm0-4H5v-2h2v2zm0-4H5V9h2v2zm6 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V9h2v2zm0-4h-2V5h2v2zm6 12h-2v-2h2v2zm0-4h-2v-2h2v2z"/>
-                </svg>
+        html: renderToString(
+            <div
+                style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#22c55e',
+                    filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.5))',
+                }}
+            >
+                <FaCity style={{ width: '12px', height: '12px' }} />
             </div>
-        `,
+        ),
         iconSize: [12, 12],
         iconAnchor: [6, 6],
     });
