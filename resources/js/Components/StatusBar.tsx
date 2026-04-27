@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { LuCode } from 'react-icons/lu';
+import { FaGithub } from 'react-icons/fa6';
 
 interface HealthCheck {
     status: string;
@@ -22,16 +24,16 @@ export default function StatusBar({
     renderedIcons,
     totalRenderedShips,
     trackedShips,
+    currentArea = 'WORLD OVERVIEW',
 }: {
     renderedIcons: number;
     totalRenderedShips: number;
     trackedShips: number;
+    currentArea?: string;
 }) {
     const [systemStatus, setSystemStatus] = useState<ReadyResponse | null>(null);
     const [showDetails, setShowDetails] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
-
-    const currentArea = 'LOCATION PLACEHOLDER';
 
     useEffect(() => {
         const fetchStatus = async () => {
@@ -87,83 +89,124 @@ export default function StatusBar({
                     />
                     <Divider />
                     <StatItem label="Tracked" value={trackedShips.toLocaleString()} />
-                    <Divider />
+                    <Divider className="hidden sm:block" />
                     <span className="text-zinc-500 text-[10px] whitespace-nowrap hidden sm:inline">
                         {currentArea}
                     </span>
-                    <Divider className="hidden sm:block" />
+                    <Divider className="max-md:hidden" />
                     <span className="text-zinc-500 text-[10px] font-mono whitespace-nowrap hidden md:inline">
                         {currentTime.toLocaleTimeString('en-GB', {
                             hour: '2-digit',
                             minute: '2-digit',
                             second: '2-digit',
-                        })}{' '}
-                        UTC
+                        })}
+                        <span className="ml-2 text-zinc-600">
+                            (UTC:{' '}
+                            {currentTime.toLocaleTimeString('en-GB', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                timeZone: 'UTC',
+                            })}
+                            )
+                        </span>
                     </span>
                 </div>
 
-                {/* Right section - System Status */}
-                <div className="relative shrink-0">
-                    <button
-                        className="flex items-center gap-2 px-2 py-1 rounded-md transition-colors hover:bg-zinc-900/50"
-                        onClick={() => setShowDetails(!showDetails)}
-                    >
-                        <div className="relative flex items-center">
-                            <div
-                                className={`w-1.5 h-1.5 rounded-full ${statusInfo.color} ring-2 ${statusInfo.ring}`}
-                            />
-                        </div>
-                        <span className="text-zinc-300 hidden sm:inline">{statusInfo.text}</span>
-                    </button>
+                {/* Right section - System Status & Links */}
+                <div className="flex items-center gap-3 shrink-0">
+                    <div className="flex items-center gap-3">
+                        <a
+                            href="/docs"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors hover:bg-zinc-900/50 hover:text-zinc-200"
+                            title="API Documentation"
+                        >
+                            <LuCode className="w-3.5 h-3.5" />
+                            <span className="hidden lg:inline">API Documentation</span>
+                        </a>
 
-                    {showDetails && systemStatus && (
-                        <div className="absolute bottom-full right-0 mb-2 bg-zinc-900 border border-zinc-800 rounded-lg shadow-2xl p-4 w-80 sm:w-96 backdrop-blur-xl">
-                            <div className="space-y-3">
-                                <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
-                                    <div>
-                                        <div className="font-semibold text-zinc-100 text-sm">
-                                            System Health
+                        <Divider className="h-3 hidden sm:block" />
+
+                        <a
+                            href="https://github.com/tristanbudd/sist"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors hover:bg-zinc-900/50 hover:text-zinc-200"
+                            title="View on GitHub"
+                        >
+                            <FaGithub className="w-3.5 h-3.5" />
+                            <span className="hidden lg:inline">View on GitHub</span>
+                        </a>
+                    </div>
+
+                    <Divider className="h-3" />
+
+                    <div className="relative">
+                        <button
+                            className="flex items-center gap-2 px-2 py-1 rounded-md transition-colors hover:bg-zinc-900/50"
+                            onClick={() => setShowDetails(!showDetails)}
+                        >
+                            <div className="relative flex items-center">
+                                <div
+                                    className={`w-1.5 h-1.5 rounded-full ${statusInfo.color} ring-2 ${statusInfo.ring}`}
+                                />
+                            </div>
+                            <span className="text-zinc-300 hidden sm:inline">
+                                {statusInfo.text}
+                            </span>
+                        </button>
+
+                        {showDetails && systemStatus && (
+                            <div className="absolute bottom-full right-0 mb-2 bg-zinc-950 border border-white/20 shadow-2xl p-4 w-80 sm:w-96 animate-in slide-in-from-bottom-2 duration-200">
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                                        <div>
+                                            <div className="font-semibold text-zinc-100 text-sm">
+                                                System Health
+                                            </div>
+                                            <div className="text-[10px] text-zinc-500 mt-0.5">
+                                                {new Date(systemStatus.timestamp).toLocaleString()}
+                                            </div>
                                         </div>
-                                        <div className="text-[10px] text-zinc-500 mt-0.5">
-                                            {new Date(systemStatus.timestamp).toLocaleString()}
-                                        </div>
+                                        <button
+                                            onClick={() => setShowDetails(false)}
+                                            className="text-zinc-500 hover:text-white transition-colors w-5 h-5 flex items-center justify-center rounded hover:bg-white/10"
+                                        >
+                                            ✕
+                                        </button>
                                     </div>
-                                    <button
-                                        onClick={() => setShowDetails(false)}
-                                        className="text-zinc-500 hover:text-zinc-300 transition-colors w-6 h-6 flex items-center justify-center rounded hover:bg-zinc-800"
-                                    >
-                                        ✕
-                                    </button>
-                                </div>
 
-                                <div className="space-y-2">
-                                    <StatusDetail
-                                        name="Database"
-                                        status={systemStatus.checks.database.status}
-                                        latency={systemStatus.checks.database.latency_ms}
-                                        message={systemStatus.checks.database.message}
-                                    />
+                                    <div className="space-y-2">
+                                        <StatusDetail
+                                            name="Database"
+                                            status={systemStatus.checks.database.status}
+                                            latency={systemStatus.checks.database.latency_ms}
+                                            message={systemStatus.checks.database.message}
+                                        />
 
-                                    <StatusDetail
-                                        name="Cache"
-                                        status={systemStatus.checks.cache.status}
-                                        latency={systemStatus.checks.cache.latency_ms}
-                                        message={systemStatus.checks.cache.message}
-                                    />
+                                        <StatusDetail
+                                            name="Cache"
+                                            status={systemStatus.checks.cache.status}
+                                            latency={systemStatus.checks.cache.latency_ms}
+                                            message={systemStatus.checks.cache.message}
+                                        />
 
-                                    <StatusDetail
-                                        name="AIS Stream"
-                                        status={systemStatus.checks.ais_stream.status}
-                                        latency={systemStatus.checks.ais_stream.latency_ms}
-                                        message={systemStatus.checks.ais_stream.message}
-                                        lastMessageAge={
-                                            systemStatus.checks.ais_stream.last_message_age_seconds
-                                        }
-                                    />
+                                        <StatusDetail
+                                            name="AIS Stream"
+                                            status={systemStatus.checks.ais_stream.status}
+                                            latency={systemStatus.checks.ais_stream.latency_ms}
+                                            message={systemStatus.checks.ais_stream.message}
+                                            lastMessageAge={
+                                                systemStatus.checks.ais_stream
+                                                    .last_message_age_seconds
+                                            }
+                                        />
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -185,7 +228,7 @@ interface StatItemProps {
 function StatItem({ label, value }: StatItemProps) {
     return (
         <div className="flex items-center gap-1.5">
-            <span className="text-zinc-500 text-[10px]">{label}:</span>
+            <span className="text-zinc-500 text-[10px] hidden lg:inline">{label}:</span>
             <span className="text-zinc-200 font-semibold">{value}</span>
         </div>
     );
@@ -211,7 +254,7 @@ function StatusDetail({ name, status, latency, message, lastMessageAge }: Status
     const isOk = status === 'ok';
 
     return (
-        <div className="flex items-center justify-between py-2.5 px-3 rounded-md bg-zinc-950/50 border border-zinc-800/50">
+        <div className="flex items-center justify-between py-2.5 px-3 bg-zinc-900/30 border border-white/5">
             <div className="flex items-center gap-3">
                 <div
                     className={`w-2 h-2 rounded-full ${isOk ? 'bg-emerald-500' : 'bg-red-500'} ring-2 ${isOk ? 'ring-emerald-500/20' : 'ring-red-500/20'}`}

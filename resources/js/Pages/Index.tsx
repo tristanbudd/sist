@@ -3,12 +3,22 @@ import { Head } from '@inertiajs/react';
 import MainLayout from '../Layouts/MainLayout';
 import HeaderBar from '../Components/HeaderBar';
 import MapDisplay, { Vessel } from '../Components/MapDisplay';
+import ShipDetailsSidebar from '../Components/ShipDetailsSidebar';
 
 interface FleetStats {
     renderedIcons: number;
     totalRenderedShips: number;
     trackedShips: number;
     trackedVessels: Vessel[];
+    currentArea: string;
+}
+
+export interface HistoryPosition {
+    lat: number;
+    lng: number;
+    speed: number;
+    course: number;
+    recorded_at: string;
 }
 
 export default function Index() {
@@ -21,15 +31,19 @@ export default function Index() {
         renderedIcons: 0,
         totalRenderedShips: 0,
         trackedShips: 0,
+        currentArea: 'WORLD OVERVIEW',
     });
 
     const [trackedVessels, setTrackedVessels] = useState<Vessel[]>([]);
     const [selectedVessel, setSelectedVessel] = useState<Vessel | null>(null);
+    const [historyData, setHistoryData] = useState<HistoryPosition[]>([]);
+    const [showHistory, setShowHistory] = useState(false);
+    const [showWaypoints, setShowWaypoints] = useState(true);
     const [showClusterZoomNotice, setShowClusterZoomNotice] = useState(false);
     const clusterZoomNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const handleNavigate = useCallback((lat: number, lon: number, zoom: number = 12) => {
-        setMapViewState({ center: [lat, lon], zoom });
+    const handleNavigate = useCallback((lat: number, lng: number, zoom: number = 12) => {
+        setMapViewState({ center: [lat, lng], zoom });
     }, []);
 
     const handleFleetUpdate = useCallback((stats: FleetStats) => {
@@ -37,31 +51,33 @@ export default function Index() {
             renderedIcons: stats.renderedIcons,
             totalRenderedShips: stats.totalRenderedShips,
             trackedShips: stats.trackedShips,
+            currentArea: stats.currentArea,
         });
         setTrackedVessels(stats.trackedVessels || []);
     }, []);
 
     const handleSelectVessel = useCallback((vessel: Vessel | null) => {
         setSelectedVessel(vessel);
+        setHistoryData([]);
     }, []);
 
     const handleClusterZoomNotice = useCallback(() => {
-        setShowClusterZoomNotice(true);
         if (clusterZoomNoticeTimerRef.current) {
             clearTimeout(clusterZoomNoticeTimerRef.current);
         }
+        setShowClusterZoomNotice(true);
         clusterZoomNoticeTimerRef.current = setTimeout(() => {
             setShowClusterZoomNotice(false);
-        }, 1800);
+        }, 5000);
     }, []);
 
     return (
         <MainLayout
             header={
                 <HeaderBar
+                    trackedVessels={trackedVessels}
                     onNavigate={handleNavigate}
-                    vessels={trackedVessels}
-                    onSelectVessel={handleSelectVessel}
+                    onVesselSelect={handleSelectVessel}
                     selectedVesselName={
                         selectedVessel
                             ? selectedVessel.name?.trim() || `MMSI ${selectedVessel.mmsi}`
@@ -80,6 +96,20 @@ export default function Index() {
                 selectedMmsi={selectedVessel?.mmsi ?? null}
                 onVesselSelect={handleSelectVessel}
                 onClusterZoomNotice={handleClusterZoomNotice}
+                historyPositions={historyData}
+                showHistory={showHistory}
+                showWaypoints={showWaypoints}
+                sidebarOpen={!!selectedVessel}
+            />
+            <ShipDetailsSidebar
+                vessel={selectedVessel}
+                onClose={() => handleSelectVessel(null)}
+                onHistoryUpdate={setHistoryData}
+                showHistory={showHistory}
+                onShowHistoryChange={setShowHistory}
+                onNavigate={handleNavigate}
+                showWaypoints={showWaypoints}
+                onShowWaypointsChange={setShowWaypoints}
             />
         </MainLayout>
     );
