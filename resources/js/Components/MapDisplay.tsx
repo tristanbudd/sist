@@ -253,6 +253,12 @@ function FleetLayer({
             recordActivity();
             debouncedFetch();
         },
+        popupclose: () => {
+            suppressNextMapClickRef.current = true;
+            setTimeout(() => {
+                suppressNextMapClickRef.current = false;
+            }, 100);
+        },
         click: (e) => {
             recordActivity();
             const target = e.originalEvent?.target as HTMLElement | null;
@@ -650,6 +656,7 @@ function PortLayer() {
                                         map.closePopup();
                                     }}
                                     className="text-zinc-500 hover:text-white transition-colors"
+                                    title="Close"
                                 >
                                     <FaXmark className="w-3 h-3" />
                                 </button>
@@ -765,6 +772,7 @@ function CityLayer() {
                                         map.closePopup();
                                     }}
                                     className="text-zinc-500 hover:text-white transition-colors"
+                                    title="Close"
                                 >
                                     <FaXmark className="w-3 h-3" />
                                 </button>
@@ -812,6 +820,7 @@ function LayerControl({
                             <button
                                 onClick={() => setIsOpen(false)}
                                 className="text-zinc-500 hover:text-white transition-colors w-5 h-5 flex items-center justify-center rounded hover:bg-white/10"
+                                title="Close"
                             >
                                 <FaXmark className="w-3 h-3" />
                             </button>

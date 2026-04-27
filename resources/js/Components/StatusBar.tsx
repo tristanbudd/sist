@@ -38,7 +38,8 @@ export default function StatusBar({
     useEffect(() => {
         const fetchStatus = async () => {
             try {
-                const response = await fetch('/api/status/ready');
+                // TODO: Change back to relative link after dev
+                const response = await fetch('https://sist.tristanbudd.com/api/status/ready');
                 const data = await response.json();
                 setSystemStatus(data);
             } catch (error) {
@@ -76,7 +77,7 @@ export default function StatusBar({
 
     return (
         <>
-            <div className="fixed bottom-0 left-0 right-0 h-8 bg-zinc-950 border-t border-zinc-800/50 flex items-center justify-between px-4 text-zinc-400 text-[11px] font-medium z-100">
+            <div className="fixed bottom-0 left-0 right-0 h-8 bg-zinc-950 border-t border-zinc-800/50 flex items-center justify-between px-4 text-zinc-400 text-[11px] font-medium z-[3000]">
                 {/* Left section - Stats */}
                 <div className="flex items-center gap-3 overflow-x-auto">
                     <StatItem
@@ -172,6 +173,7 @@ export default function StatusBar({
                                         <button
                                             onClick={() => setShowDetails(false)}
                                             className="text-zinc-500 hover:text-white transition-colors w-5 h-5 flex items-center justify-center rounded hover:bg-white/10"
+                                            title="Close"
                                         >
                                             ✕
                                         </button>
@@ -212,7 +214,7 @@ export default function StatusBar({
 
             {showDetails && systemStatus && (
                 <div
-                    className="fixed inset-0 z-99 bg-transparent"
+                    className="fixed inset-0 z-[2999] bg-transparent"
                     onClick={() => setShowDetails(false)}
                 />
             )}
@@ -265,7 +267,17 @@ function StatusDetail({ name, status, latency, message, lastMessageAge }: Status
                         <div className="text-[10px] text-red-400 mt-0.5">{message}</div>
                     ) : lastMessageAge !== undefined ? (
                         <div className="text-zinc-500 text-[10px] font-mono">
-                            Last Updated: {Math.round(lastMessageAge)}s ago
+                            Last Updated:{' '}
+                            {(() => {
+                                const absSec = Math.round(Math.abs(lastMessageAge));
+                                if (absSec < 60) return `${absSec} seconds ago`;
+                                if (absSec < 3600) {
+                                    const mins = Math.floor(absSec / 60);
+                                    return `${mins} minute${mins !== 1 ? 's' : ''} ago`;
+                                }
+                                const hours = Math.floor(absSec / 3600);
+                                return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+                            })()}
                         </div>
                     ) : null}
                 </div>
