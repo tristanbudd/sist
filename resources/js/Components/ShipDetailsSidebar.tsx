@@ -11,6 +11,7 @@ import {
     FaArrowRight,
     FaCircleExclamation,
     FaCircleCheck,
+    FaLocationArrow,
 } from 'react-icons/fa6';
 import { LuAnchor, LuWaves, LuThermometer } from 'react-icons/lu';
 import axios from 'axios';
@@ -274,7 +275,7 @@ export default function ShipDetailsSidebar({ vessel, onClose }: ShipDetailsSideb
                         <StatusCard
                             label="Heading"
                             value={loading.details ? '...' : `${details?.heading || 'N/A'}°`}
-                            icon={<FaCompass className="text-zinc-600 opacity-50" />}
+                            icon={<FaLocationArrow className="text-zinc-500" />}
                         />
                     </div>
 
@@ -660,7 +661,11 @@ export default function ShipDetailsSidebar({ vessel, onClose }: ShipDetailsSideb
             </div>
 
             <div className="p-6 border-t border-white/10 shrink-0 bg-zinc-950">
-                <button className="w-full py-3 bg-zinc-100 hover:bg-white text-black font-black uppercase text-xs tracking-widest transition-all active:scale-[0.98] flex items-center justify-center gap-2 group">
+                {/* TODO: Implement full intelligence analysis report generator */}
+                <button
+                    onClick={() => alert('Full Intelligence Analysis Reports are coming soon.')}
+                    className="w-full py-3 bg-zinc-100 hover:bg-white text-black font-black uppercase text-xs tracking-widest transition-all active:scale-[0.98] flex items-center justify-center gap-2 group"
+                >
                     View Full Analysis Report
                     <FaArrowRight className="group-hover:translate-x-1 transition-transform" />
                 </button>
