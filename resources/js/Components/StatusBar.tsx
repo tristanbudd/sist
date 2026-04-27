@@ -38,7 +38,8 @@ export default function StatusBar({
     useEffect(() => {
         const fetchStatus = async () => {
             try {
-                const response = await fetch('/api/status/ready');
+                // TODO: Change back to relative link after dev
+                const response = await fetch('https://sist.tristanbudd.com/api/status/ready');
                 const data = await response.json();
                 setSystemStatus(data);
             } catch (error) {
@@ -265,7 +266,17 @@ function StatusDetail({ name, status, latency, message, lastMessageAge }: Status
                         <div className="text-[10px] text-red-400 mt-0.5">{message}</div>
                     ) : lastMessageAge !== undefined ? (
                         <div className="text-zinc-500 text-[10px] font-mono">
-                            Last Updated: {Math.round(lastMessageAge)}s ago
+                            Last Updated:{' '}
+                            {(() => {
+                                const absSec = Math.round(Math.abs(lastMessageAge));
+                                if (absSec < 60) return `${absSec} seconds ago`;
+                                if (absSec < 3600) {
+                                    const mins = Math.floor(absSec / 60);
+                                    return `${mins} minute${mins !== 1 ? 's' : ''} ago`;
+                                }
+                                const hours = Math.floor(absSec / 3600);
+                                return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+                            })()}
                         </div>
                     ) : null}
                 </div>

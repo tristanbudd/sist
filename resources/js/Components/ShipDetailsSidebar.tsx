@@ -956,11 +956,18 @@ export default function ShipDetailsSidebar({
                                 {loading.details
                                     ? '...'
                                     : details?.position_age_seconds !== undefined
-                                      ? details.position_age_seconds < 60
-                                          ? `${details.position_age_seconds}s ago`
-                                          : details.position_age_seconds < 3600
-                                            ? `${Math.floor(details.position_age_seconds / 60)}m ago`
-                                            : `${Math.floor(details.position_age_seconds / 3600)}h ago`
+                                      ? (() => {
+                                            const absSec = Math.round(
+                                                Math.abs(details.position_age_seconds)
+                                            );
+                                            if (absSec < 60) return `${absSec} seconds ago`;
+                                            if (absSec < 3600) {
+                                                const mins = Math.floor(absSec / 60);
+                                                return `${mins} minute${mins !== 1 ? 's' : ''} ago`;
+                                            }
+                                            const hours = Math.floor(absSec / 3600);
+                                            return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+                                        })()
                                       : 'N/A'}
                             </span>
                         </div>
