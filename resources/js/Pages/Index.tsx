@@ -13,6 +13,14 @@ interface FleetStats {
     currentArea: string;
 }
 
+export interface HistoryPosition {
+    lat: number;
+    lng: number;
+    speed: number;
+    course: number;
+    recorded_at: string;
+}
+
 export default function Index() {
     const [mapViewState, setMapViewState] = useState<{ center: [number, number]; zoom: number }>({
         center: [20, 0],
@@ -28,6 +36,9 @@ export default function Index() {
 
     const [trackedVessels, setTrackedVessels] = useState<Vessel[]>([]);
     const [selectedVessel, setSelectedVessel] = useState<Vessel | null>(null);
+    const [historyData, setHistoryData] = useState<HistoryPosition[]>([]);
+    const [showHistory, setShowHistory] = useState(false);
+    const [showWaypoints, setShowWaypoints] = useState(true);
     const [showClusterZoomNotice, setShowClusterZoomNotice] = useState(false);
     const clusterZoomNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -47,25 +58,26 @@ export default function Index() {
 
     const handleSelectVessel = useCallback((vessel: Vessel | null) => {
         setSelectedVessel(vessel);
+        setHistoryData([]);
     }, []);
 
     const handleClusterZoomNotice = useCallback(() => {
-        setShowClusterZoomNotice(true);
         if (clusterZoomNoticeTimerRef.current) {
             clearTimeout(clusterZoomNoticeTimerRef.current);
         }
+        setShowClusterZoomNotice(true);
         clusterZoomNoticeTimerRef.current = setTimeout(() => {
             setShowClusterZoomNotice(false);
-        }, 1800);
+        }, 5000);
     }, []);
 
     return (
         <MainLayout
             header={
                 <HeaderBar
+                    trackedVessels={trackedVessels}
                     onNavigate={handleNavigate}
-                    vessels={trackedVessels}
-                    onSelectVessel={handleSelectVessel}
+                    onVesselSelect={handleSelectVessel}
                     selectedVesselName={
                         selectedVessel
                             ? selectedVessel.name?.trim() || `MMSI ${selectedVessel.mmsi}`
@@ -84,8 +96,21 @@ export default function Index() {
                 selectedMmsi={selectedVessel?.mmsi ?? null}
                 onVesselSelect={handleSelectVessel}
                 onClusterZoomNotice={handleClusterZoomNotice}
+                historyPositions={historyData}
+                showHistory={showHistory}
+                showWaypoints={showWaypoints}
+                sidebarOpen={!!selectedVessel}
             />
-            <ShipDetailsSidebar vessel={selectedVessel} onClose={() => handleSelectVessel(null)} />
+            <ShipDetailsSidebar
+                vessel={selectedVessel}
+                onClose={() => handleSelectVessel(null)}
+                onHistoryUpdate={setHistoryData}
+                showHistory={showHistory}
+                onShowHistoryChange={setShowHistory}
+                onNavigate={handleNavigate}
+                showWaypoints={showWaypoints}
+                onShowWaypointsChange={setShowWaypoints}
+            />
         </MainLayout>
     );
 }

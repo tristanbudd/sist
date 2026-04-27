@@ -1,6 +1,15 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { renderToString } from 'react-dom/server';
-import { MapContainer, TileLayer, useMap, Marker, Popup, useMapEvents } from 'react-leaflet';
+import {
+    MapContainer,
+    TileLayer,
+    useMap,
+    Marker,
+    Popup,
+    useMapEvents,
+    Polyline,
+    CircleMarker,
+} from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import {
     FaPlus,
@@ -16,6 +25,7 @@ import axios from 'axios';
 import portsData from '../../data/ports.json';
 import countriesData from '../../data/countries.json';
 import citiesData from '../../data/cities.json';
+import { HistoryPosition } from '../Pages/Index';
 
 // @ts-expect-error - Leaflet icon fix
 delete L.Icon.Default.prototype._getIconUrl;
@@ -98,6 +108,8 @@ function FleetLayer({
     selectedMmsi,
     onVesselSelect,
     onClusterZoomNotice,
+    showAll,
+    sidebarOpen,
 }: {
     onUpdate?: (stats: {
         renderedIcons: number;
@@ -109,6 +121,8 @@ function FleetLayer({
     selectedMmsi: number | null;
     onVesselSelect?: (vessel: Vessel | null) => void;
     onClusterZoomNotice?: () => void;
+    showAll?: boolean;
+    sidebarOpen?: boolean;
 }) {
     const map = useMap();
     const [windowVessels, setWindowVessels] = useState<Vessel[]>([]);
@@ -292,6 +306,11 @@ function FleetLayer({
         }
 
         windowVessels.forEach((vessel) => {
+            if (vessel.mmsi === selectedMmsi) {
+                filtered.push({ ...vessel, isCluster: false, clusterCount: 1 });
+                return;
+            }
+
             const pos = map.latLngToLayerPoint([vessel.lat, vessel.lng]);
             const clusterIndex = filtered.findIndex((f) => {
                 const fPos = map.latLngToLayerPoint([f.lat, f.lng]);
@@ -308,7 +327,7 @@ function FleetLayer({
         });
 
         return filtered;
-    }, [windowVessels, map, zoom]);
+    }, [windowVessels, map, zoom, selectedMmsi]);
 
     const getAreaName = useCallback((lat: number, lng: number, currentZoom: number) => {
         if (currentZoom <= 3) return 'WORLD OVERVIEW';
@@ -490,7 +509,7 @@ function FleetLayer({
         <>
             {isIdle && (
                 <div
-                    className="fixed inset-0 z-2000 flex items-center justify-center bg-zinc-950/40 backdrop-blur-sm animate-in fade-in duration-500 cursor-pointer p-4"
+                    className={`fixed inset-0 z-2000 flex items-center justify-center bg-zinc-950/40 backdrop-blur-sm animate-in fade-in cursor-pointer p-4 transition-all duration-500 ${sidebarOpen ? 'sm:right-[400px]' : ''}`}
                     onClick={recordActivity}
                 >
                     <div className="bg-zinc-950/90 border border-amber-500/50 p-6 shadow-2xl flex flex-col items-center gap-4 text-center max-w-xs w-full animate-in zoom-in-95 duration-300">
@@ -518,24 +537,26 @@ function FleetLayer({
                 </div>
             )}
 
-            {visibleVessels.map((vessel) => (
-                <Marker
-                    key={vessel.mmsi}
-                    position={[vessel.lat, vessel.lng]}
-                    interactive={true}
-                    bubblingMouseEvents={false}
-                    riseOnHover={true}
-                    icon={createVesselIcon(
-                        vessel.course || 0,
-                        vessel.isCluster,
-                        vessel.mmsi === selectedMmsi
-                    )}
-                    eventHandlers={{
-                        mousedown: (e) => handleMarkerClick(vessel, e),
-                        click: (e) => handleMarkerClick(vessel, e),
-                    }}
-                />
-            ))}
+            {visibleVessels
+                .filter((v) => showAll || v.mmsi === selectedMmsi)
+                .map((vessel) => (
+                    <Marker
+                        key={vessel.mmsi}
+                        position={[vessel.lat, vessel.lng]}
+                        interactive={true}
+                        bubblingMouseEvents={false}
+                        riseOnHover={true}
+                        icon={createVesselIcon(
+                            vessel.course || 0,
+                            vessel.isCluster,
+                            vessel.mmsi === selectedMmsi
+                        )}
+                        eventHandlers={{
+                            mousedown: (e) => handleMarkerClick(vessel, e),
+                            click: (e) => handleMarkerClick(vessel, e),
+                        }}
+                    />
+                ))}
         </>
     );
 }
@@ -678,7 +699,6 @@ function CityLayer() {
         for (let i = 0; i < cities.length; i++) {
             const city = cities[i];
 
-            // Fast bounds check
             if (
                 city.lat < bounds.getSouth() ||
                 city.lat > bounds.getNorth() ||
@@ -955,6 +975,10 @@ interface MapDisplayProps {
     selectedMmsi: number | null;
     onVesselSelect?: (vessel: Vessel | null) => void;
     onClusterZoomNotice?: () => void;
+    historyPositions?: HistoryPosition[];
+    showHistory?: boolean;
+    showWaypoints?: boolean;
+    sidebarOpen?: boolean;
 }
 
 export default function MapDisplay({
@@ -964,6 +988,10 @@ export default function MapDisplay({
     selectedMmsi,
     onVesselSelect,
     onClusterZoomNotice,
+    historyPositions = [],
+    showHistory = false,
+    showWaypoints = true,
+    sidebarOpen = false,
 }: MapDisplayProps) {
     const [showVessels, setShowVessels] = useState(true);
     const [showPorts, setShowPorts] = useState(false);
@@ -988,14 +1016,19 @@ export default function MapDisplay({
 
                 {showPorts && <PortLayer />}
                 {showCities && <CityLayer />}
-                {showVessels && (
-                    <FleetLayer
-                        onUpdate={onFleetUpdate}
-                        selectedMmsi={selectedMmsi}
-                        onVesselSelect={onVesselSelect}
-                        onClusterZoomNotice={onClusterZoomNotice}
-                    />
-                )}
+                <FleetLayer
+                    onUpdate={onFleetUpdate}
+                    selectedMmsi={selectedMmsi}
+                    onVesselSelect={onVesselSelect}
+                    onClusterZoomNotice={onClusterZoomNotice}
+                    showAll={showVessels}
+                    sidebarOpen={sidebarOpen}
+                />
+                <TrajectoryLayer
+                    positions={historyPositions}
+                    show={showHistory}
+                    showWaypoints={showWaypoints}
+                />
                 <MapViewHandler center={center} zoom={zoom} />
                 <ZoomControls />
                 <LayerControl
@@ -1010,5 +1043,119 @@ export default function MapDisplay({
 
             <div className="pointer-events-none absolute inset-0 z-1 shadow-[inset_0_0_150px_rgba(0,0,0,0.8)]" />
         </div>
+    );
+}
+function TrajectoryLayer({
+    positions,
+    show,
+    showWaypoints,
+}: {
+    positions: HistoryPosition[];
+    show: boolean;
+    showWaypoints: boolean;
+}) {
+    const merged = useMemo(() => {
+        if (!show || !positions || positions.length === 0) return [];
+        const result: (HistoryPosition & { mergedCount: number })[] = [];
+        positions.forEach((p) => {
+            if (result.length === 0) {
+                result.push({ ...p, mergedCount: 1 });
+                return;
+            }
+            const last = result[result.length - 1];
+            const dist = Math.sqrt(
+                Math.pow(Number(p.lat) - Number(last.lat), 2) +
+                    Math.pow(Number(p.lng) - Number(last.lng), 2)
+            );
+            if (dist < 0.0005) {
+                last.mergedCount++;
+            } else {
+                result.push({ ...p, mergedCount: 1 });
+            }
+        });
+        return result;
+    }, [positions, show]);
+
+    if (!show || !positions || positions.length === 0) return null;
+
+    const path = positions.map((p) => [Number(p.lat), Number(p.lng)] as [number, number]);
+
+    return (
+        <>
+            <Polyline
+                positions={path}
+                pathOptions={{
+                    color: '#f4f4f5',
+                    weight: 2,
+                    dashArray: '5, 10',
+                    opacity: 0.6,
+                }}
+            />
+            {showWaypoints &&
+                merged.map((p, i) => (
+                    <CircleMarker
+                        key={`${p.recorded_at}-${i}`}
+                        center={[Number(p.lat), Number(p.lng)]}
+                        radius={3}
+                        pathOptions={{
+                            fillColor: '#f4f4f5',
+                            fillOpacity: 0.8,
+                            color: '#09090b',
+                            weight: 1,
+                        }}
+                    >
+                        <Popup closeButton={false} minWidth={220} className="sist-popup">
+                            <div className="bg-zinc-950 border border-white/20 shadow-2xl p-4 min-w-[220px]">
+                                <div className="flex flex-col gap-1 border-b border-white/10 pb-2 mb-2">
+                                    <span className="font-bold text-[10px] uppercase tracking-[0.2em] text-zinc-200">
+                                        {p.mergedCount > 1 ? 'Stationary Block' : 'Waypoint Detail'}
+                                    </span>
+                                    <span className="text-[10px] font-mono text-zinc-500">
+                                        {new Date(p.recorded_at).toLocaleTimeString('en-GB', {
+                                            hour: '2-digit',
+                                            minute: '2-digit',
+                                            day: '2-digit',
+                                            month: 'short',
+                                            timeZone: 'Europe/London',
+                                        })}
+                                    </span>
+                                </div>
+
+                                {p.mergedCount > 1 && (
+                                    <div className="text-[9px] text-zinc-500 font-black uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                                        <FaLayerGroup className="w-2.5 h-2.5 text-zinc-600" />
+                                        {p.mergedCount} Records in this area
+                                    </div>
+                                )}
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="flex flex-col gap-0.5">
+                                        <span className="text-[8px] text-zinc-600 uppercase font-black tracking-tighter">
+                                            Speed
+                                        </span>
+                                        <span className="text-[11px] font-black text-zinc-300">
+                                            {Number(p.speed).toFixed(1)} kn
+                                        </span>
+                                    </div>
+                                    <div className="flex flex-col gap-0.5 text-right">
+                                        <span className="text-[8px] text-zinc-600 uppercase font-black tracking-tighter">
+                                            Course
+                                        </span>
+                                        <span className="text-[11px] font-black text-zinc-300">
+                                            {Number(p.course).toFixed(0)}°
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="mt-3 pt-2 border-t border-white/5 flex items-center justify-between">
+                                    <span className="text-[9px] text-zinc-600 font-mono">
+                                        {Number(p.lat).toFixed(4)}, {Number(p.lng).toFixed(4)}
+                                    </span>
+                                </div>
+                            </div>
+                        </Popup>
+                    </CircleMarker>
+                ))}
+        </>
     );
 }

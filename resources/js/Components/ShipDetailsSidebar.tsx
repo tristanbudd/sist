@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, ReactNode } from 'react';
+import { useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import {
     FaXmark,
     FaLocationDot,
@@ -8,10 +8,11 @@ import {
     FaShieldHalved,
     FaCloudSun,
     FaCircleInfo,
-    FaArrowRight,
-    FaCircleExclamation,
     FaCircleCheck,
     FaLocationArrow,
+    FaRoute,
+    FaArrowRight,
+    FaCircleExclamation,
 } from 'react-icons/fa6';
 import { LuAnchor, LuWaves, LuThermometer } from 'react-icons/lu';
 import axios from 'axios';
@@ -102,85 +103,199 @@ interface SanctionsData {
     sanctions: SanctionRecord[];
 }
 
+interface HistoryPosition {
+    lat: number;
+    lng: number;
+    speed: number;
+    course: number;
+    recorded_at: string;
+    isLatest?: boolean;
+}
+
 interface ShipDetailsSidebarProps {
     vessel: Vessel | null;
     onClose: () => void;
+    onHistoryUpdate?: (history: HistoryPosition[]) => void;
+    showHistory?: boolean;
+    onShowHistoryChange?: (show: boolean) => void;
+    onNavigate?: (lat: number, lng: number, zoom: number) => void;
+    showWaypoints?: boolean;
+    onShowWaypointsChange?: (show: boolean) => void;
 }
 
-export default function ShipDetailsSidebar({ vessel, onClose }: ShipDetailsSidebarProps) {
+export default function ShipDetailsSidebar({
+    vessel,
+    onClose,
+    onHistoryUpdate,
+    showHistory,
+    onShowHistoryChange,
+    onNavigate,
+    showWaypoints = true,
+    onShowWaypointsChange,
+}: ShipDetailsSidebarProps) {
     const [details, setDetails] = useState<VesselDetails | null>(null);
     const [weather, setWeather] = useState<WeatherData | null>(null);
     const [tides, setTides] = useState<TideData | null>(null);
     const [sanctions, setSanctions] = useState<SanctionsData | null>(null);
+    const [history, setHistory] = useState<HistoryPosition[]>([]);
+    const [historyHours, setHistoryHours] = useState(24);
+    const [waypointsLimit, setWaypointsLimit] = useState(10);
+    const [hasEnvError, setHasEnvError] = useState(false);
     const [loading, setLoading] = useState<{
         details: boolean;
         weather: boolean;
         tides: boolean;
         sanctions: boolean;
+        history: boolean;
     }>({
         details: false,
         weather: false,
         tides: false,
         sanctions: false,
+        history: false,
     });
 
-    const fetchAllData = useCallback(async (mmsi: number) => {
-        setDetails(null);
-        setWeather(null);
-        setTides(null);
-        setSanctions(null);
-        setLoading({ details: true, weather: true, tides: true, sanctions: true });
+    const fetchAllData = useCallback(
+        async (mmsi: number) => {
+            setDetails(null);
+            setWeather(null);
+            setTides(null);
+            setSanctions(null);
+            setWaypointsLimit(10);
+            setHasEnvError(false);
+            setHistory([]);
+            setLoading({
+                details: true,
+                weather: true,
+                tides: true,
+                sanctions: true,
+                history: true,
+            });
 
-        // TODO: Set API links back to relative paths after development
-        try {
-            const res = await axios.get(`https://sist.tristanbudd.com/api/vessels/${mmsi}`);
-            setDetails(res.data);
-        } catch (err) {
-            console.error('Failed to fetch vessel details:', err);
-        } finally {
-            setLoading((prev) => ({ ...prev, details: false }));
-        }
-
-        try {
-            const res = await axios.get(
-                `https://sist.tristanbudd.com/api/conditions/weather/${mmsi}`
-            );
-            setWeather(res.data);
-        } catch (err) {
-            console.error('Failed to fetch weather:', err);
-        } finally {
-            setLoading((prev) => ({ ...prev, weather: false }));
-        }
-
-        try {
-            const res = await axios.get(
-                `https://sist.tristanbudd.com/api/conditions/tides/${mmsi}`
-            );
-            setTides(res.data);
-        } catch (err) {
-            console.error('Failed to fetch tides:', err);
-        } finally {
-            setLoading((prev) => ({ ...prev, tides: false }));
-        }
-
-        try {
-            const res = await axios.get(
-                `https://sist.tristanbudd.com/api/vessels/${mmsi}/sanctions`
-            );
-            const sanctionsData = res.data;
-
-            // Logic: More than 3 sanctions = HIGH risk
-            if (sanctionsData.sanctions && sanctionsData.sanctions.length > 3) {
-                sanctionsData.risk_level = 'high';
+            // TODO: Set API links back to relative paths after development
+            let detailsData: VesselDetails | null = null;
+            try {
+                const res = await axios.get(`https://sist.tristanbudd.com/api/vessels/${mmsi}`);
+                detailsData = res.data;
+                setDetails(detailsData);
+            } catch (err) {
+                console.error('Failed to fetch vessel details:', err);
+            } finally {
+                setLoading((prev) => ({ ...prev, details: false }));
             }
 
-            setSanctions(sanctionsData);
-        } catch (err) {
-            console.error('Failed to fetch sanctions:', err);
-        } finally {
-            setLoading((prev) => ({ ...prev, sanctions: false }));
-        }
-    }, []);
+            try {
+                const res = await axios.get(
+                    `https://sist.tristanbudd.com/api/conditions/weather/${mmsi}`
+                );
+                setWeather(res.data);
+            } catch (err) {
+                console.error('Failed to fetch weather:', err);
+                setHasEnvError(true);
+            } finally {
+                setLoading((prev) => ({ ...prev, weather: false }));
+            }
+
+            try {
+                const res = await axios.get(
+                    `https://sist.tristanbudd.com/api/conditions/tides/${mmsi}`
+                );
+                setTides(res.data);
+            } catch (err) {
+                console.error('Failed to fetch tides:', err);
+                setHasEnvError(true);
+            } finally {
+                setLoading((prev) => ({ ...prev, tides: false }));
+            }
+
+            try {
+                const res = await axios.get(
+                    `https://sist.tristanbudd.com/api/vessels/${mmsi}/sanctions`
+                );
+                const sanctionsData = res.data;
+
+                if (sanctionsData.sanctions && sanctionsData.sanctions.length > 3) {
+                    sanctionsData.risk_level = 'high';
+                }
+
+                setSanctions(sanctionsData);
+            } catch (err) {
+                console.error('Failed to fetch sanctions:', err);
+            } finally {
+                setLoading((prev) => ({ ...prev, sanctions: false }));
+            }
+
+            try {
+                setLoading((prev) => ({ ...prev, history: true }));
+                const res = await axios.get(
+                    `https://sist.tristanbudd.com/api/vessels/${mmsi}/history?hours=${historyHours}`
+                );
+                let data = res.data.history || [];
+
+                if (detailsData) {
+                    const latestHistory = data.length > 0 ? data[0] : null;
+                    const detailsTime = new Date(detailsData.last_seen_at || Date.now()).getTime();
+                    const historyTime = latestHistory
+                        ? new Date(latestHistory.recorded_at).getTime()
+                        : 0;
+
+                    const isSamePos =
+                        latestHistory &&
+                        Math.abs(Number(latestHistory.lat) - Number(detailsData.lat)) < 0.0001 &&
+                        Math.abs(Number(latestHistory.lng) - Number(detailsData.lng)) < 0.0001;
+
+                    if (!isSamePos && detailsTime > historyTime) {
+                        data = [
+                            {
+                                lat: detailsData.lat,
+                                lng: detailsData.lng,
+                                speed: detailsData.speed || 0,
+                                course: detailsData.course || 0,
+                                recorded_at: detailsData.last_seen_at || new Date().toISOString(),
+                                isLatest: true,
+                            },
+                            ...data,
+                        ];
+                    } else if (isSamePos && data.length > 0) {
+                        data[0].isLatest = true;
+                    }
+                }
+
+                setHistory(data);
+                onHistoryUpdate?.(data);
+            } catch (err) {
+                console.error('Failed to fetch history:', err);
+            } finally {
+                setLoading((prev) => ({ ...prev, history: false }));
+            }
+        },
+        [historyHours, onHistoryUpdate]
+    );
+
+    const mergedHistory = useMemo(() => {
+        if (history.length === 0) return [];
+        const result: (HistoryPosition & { mergedCount: number })[] = [];
+
+        history.forEach((pos) => {
+            if (result.length === 0) {
+                result.push({ ...pos, mergedCount: 1 });
+                return;
+            }
+
+            const last = result[result.length - 1];
+            const dist = Math.sqrt(
+                Math.pow(Number(pos.lat) - Number(last.lat), 2) +
+                    Math.pow(Number(pos.lng) - Number(last.lng), 2)
+            );
+
+            if (!pos.isLatest && !last.isLatest && dist < 0.0005) {
+                last.mergedCount++;
+            } else {
+                result.push({ ...pos, mergedCount: 1 });
+            }
+        });
+        return result;
+    }, [history]);
 
     useEffect(() => {
         if (vessel) {
@@ -440,6 +555,188 @@ export default function ShipDetailsSidebar({ vessel, onClose }: ShipDetailsSideb
                     )}
                 </section>
 
+                <section className={loading.history ? 'animate-pulse opacity-50' : ''}>
+                    <SectionTitle icon={<FaRoute />} title="Trajectory Analysis" />
+
+                    <div className="mt-4 space-y-4">
+                        <div className="p-4 bg-white/5 border border-white/10 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <div className="flex flex-col">
+                                    <span className="text-xs font-bold text-zinc-200">
+                                        Trajectory Visualization
+                                    </span>
+                                    <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-tight">
+                                        Map Overlay breadcrumbs
+                                    </span>
+                                </div>
+                                <button
+                                    onClick={() => onShowHistoryChange?.(!showHistory)}
+                                    className={`relative inline-flex h-5 w-9 items-center transition-colors focus:outline-none ${
+                                        showHistory ? 'bg-zinc-100' : 'bg-zinc-800'
+                                    }`}
+                                >
+                                    <span
+                                        className={`inline-block h-3 w-3 transform transition-transform ${
+                                            showHistory
+                                                ? 'translate-x-5 bg-black'
+                                                : 'translate-x-1 bg-zinc-500'
+                                        }`}
+                                    />
+                                </button>
+                            </div>
+
+                            {showHistory && (
+                                <div className="flex items-center justify-between border-t border-white/5 pt-4">
+                                    <div className="flex flex-col">
+                                        <span className="text-[11px] font-bold text-zinc-300">
+                                            Show Point Markers
+                                        </span>
+                                        <span className="text-[9px] text-zinc-500 uppercase font-bold tracking-tight">
+                                            Individual position dots
+                                        </span>
+                                    </div>
+                                    <button
+                                        onClick={() => onShowWaypointsChange?.(!showWaypoints)}
+                                        className={`relative inline-flex h-4 w-7 items-center transition-colors focus:outline-none ${
+                                            showWaypoints ? 'bg-zinc-400' : 'bg-zinc-800'
+                                        }`}
+                                    >
+                                        <span
+                                            className={`inline-block h-2 w-2 transform transition-transform ${
+                                                showWaypoints
+                                                    ? 'translate-x-4 bg-white'
+                                                    : 'translate-x-1 bg-zinc-600'
+                                            }`}
+                                        />
+                                    </button>
+                                </div>
+                            )}
+
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-tight">
+                                        History Window
+                                    </span>
+                                    <span className="text-[10px] text-zinc-200 font-mono">
+                                        {historyHours} Hours
+                                    </span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="6"
+                                    max="168"
+                                    step="6"
+                                    value={historyHours}
+                                    onChange={(e) => setHistoryHours(parseInt(e.target.value))}
+                                    className="w-full h-1 bg-zinc-800 appearance-none cursor-pointer accent-white"
+                                />
+                                <div className="flex justify-between text-[8px] text-zinc-600 font-black uppercase tracking-widest">
+                                    <span>6h</span>
+                                    <span>24h</span>
+                                    <span>7d</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {history.length > 0 && (
+                            <div className="space-y-1.5">
+                                <div className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-1">
+                                    Recent Waypoints
+                                </div>
+                                <div className="max-h-[300px] overflow-y-auto custom-scrollbar space-y-1 pr-1">
+                                    {mergedHistory
+                                        .slice(0, waypointsLimit)
+                                        .map(
+                                            (
+                                                pos: HistoryPosition & { mergedCount: number },
+                                                i: number
+                                            ) => (
+                                                <div
+                                                    key={i}
+                                                    onClick={() =>
+                                                        onNavigate?.(
+                                                            Number(pos.lat),
+                                                            Number(pos.lng),
+                                                            14
+                                                        )
+                                                    }
+                                                    className="bg-white/5 border border-white/5 p-2 flex items-center justify-between group hover:bg-white/10 transition-colors cursor-pointer"
+                                                >
+                                                    <div className="flex flex-col">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="text-[10px] font-mono text-zinc-500">
+                                                                {new Date(
+                                                                    pos.recorded_at
+                                                                ).toLocaleTimeString('en-GB', {
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit',
+                                                                    day: '2-digit',
+                                                                    month: 'short',
+                                                                    timeZone: 'Europe/London',
+                                                                })}
+                                                            </span>
+                                                            {pos.mergedCount > 1 && (
+                                                                <span className="text-[8px] bg-zinc-800 text-zinc-400 px-1 py-0.5 font-bold uppercase tracking-tighter">
+                                                                    {pos.mergedCount} pts merged
+                                                                </span>
+                                                            )}
+                                                            {pos.isLatest && (
+                                                                <span className="text-[8px] bg-emerald-500/10 text-emerald-500 px-1 py-0.5 font-black uppercase tracking-widest border border-emerald-500/20">
+                                                                    Latest
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <span className="text-[9px] text-zinc-600 uppercase font-bold tracking-tight">
+                                                            {Number(pos.lat).toFixed(4)},{' '}
+                                                            {Number(pos.lng).toFixed(4)}
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-right flex flex-col">
+                                                        <span className="text-[11px] font-black text-zinc-200">
+                                                            {Number(pos.speed).toFixed(1)} kn
+                                                        </span>
+                                                        <span className="text-[9px] text-zinc-600 uppercase font-bold tracking-tight">
+                                                            {Number(pos.course).toFixed(0)}°
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            )
+                                        )}
+
+                                    {mergedHistory.length > waypointsLimit && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setWaypointsLimit((prev) => prev + 10)}
+                                            className="w-full py-2 bg-white/2 hover:bg-white/5 text-[9px] text-zinc-400 hover:text-white font-bold uppercase tracking-widest transition-colors border border-white/5 mt-1"
+                                        >
+                                            Show more waypoints
+                                        </button>
+                                    )}
+                                </div>
+
+                                <div className="mt-2 p-2 bg-white/5 border border-white/5 flex items-center justify-between">
+                                    <div className="flex items-center gap-2 text-[9px] text-zinc-500 uppercase font-bold tracking-tight">
+                                        <FaClock className="w-2.5 h-2.5" />
+                                        Server Time (London)
+                                        <span className="text-zinc-400">
+                                            (
+                                            {new Date().toLocaleTimeString('en-GB', {
+                                                hour: '2-digit',
+                                                minute: '2-digit',
+                                                timeZone: 'Europe/London',
+                                            })}
+                                            )
+                                        </span>
+                                    </div>
+                                    <div className="text-[9px] text-zinc-600 font-mono">
+                                        Total: {mergedHistory.length} records
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </section>
+
                 <section
                     className={loading.weather || loading.tides ? 'animate-pulse opacity-50' : ''}
                 >
@@ -553,24 +850,35 @@ export default function ShipDetailsSidebar({ vessel, onClose }: ShipDetailsSideb
                         )}
                     </div>
 
-                    {(weather?.source || tides?.metadata.timezone) && (
-                        <div className="mt-3 p-2 bg-white/5 border border-white/5 flex items-center justify-between">
-                            <div className="flex items-center gap-2 text-[9px] text-zinc-500 uppercase font-bold tracking-tight">
-                                <FaClock className="w-2.5 h-2.5" />
-                                ETC / GMT
-                                <span className="text-zinc-400">
-                                    (
-                                    {new Date().toLocaleTimeString('en-GB', {
-                                        hour: '2-digit',
-                                        minute: '2-digit',
-                                        timeZone: 'UTC',
-                                    })}
-                                    )
-                                </span>
+                    {!loading.weather &&
+                        !loading.tides &&
+                        (weather?.source || tides?.metadata.timezone) && (
+                            <div className="mt-3 p-2 bg-white/5 border border-white/5 flex items-center justify-between">
+                                <div className="flex items-center gap-2 text-[9px] text-zinc-500 uppercase font-bold tracking-tight">
+                                    <FaClock className="w-2.5 h-2.5" />
+                                    Server Time (London)
+                                    <span className="text-zinc-400">
+                                        (
+                                        {new Date().toLocaleTimeString('en-GB', {
+                                            hour: '2-digit',
+                                            minute: '2-digit',
+                                            timeZone: 'Europe/London',
+                                        })}
+                                        )
+                                    </span>
+                                </div>
+                                <div className="text-[8px] text-zinc-600 uppercase font-black tracking-widest">
+                                    Data: {weather?.source || tides?.source || 'Open-Meteo'}
+                                </div>
                             </div>
-                            <div className="text-[8px] text-zinc-600 uppercase font-black tracking-widest">
-                                Data: {weather?.source || tides?.source || 'Open-Meteo'}
-                            </div>
+                        )}
+
+                    {hasEnvError && !loading.weather && !loading.tides && (
+                        <div className="mt-px p-2 bg-white/5 border border-white/5 flex items-center gap-2">
+                            <FaCircleInfo className="text-zinc-500 w-3 h-3" />
+                            <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-tight">
+                                Unable to fetch environmental data for this location
+                            </span>
                         </div>
                     )}
                 </section>

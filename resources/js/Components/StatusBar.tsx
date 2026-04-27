@@ -99,8 +99,16 @@ export default function StatusBar({
                             hour: '2-digit',
                             minute: '2-digit',
                             second: '2-digit',
-                        })}{' '}
-                        UTC
+                        })}
+                        <span className="ml-2 text-zinc-600">
+                            (UTC:{' '}
+                            {currentTime.toLocaleTimeString('en-GB', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                timeZone: 'UTC',
+                            })}
+                            )
+                        </span>
                     </span>
                 </div>
 

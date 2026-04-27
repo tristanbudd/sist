@@ -63,8 +63,8 @@ interface Coordinates {
 
 interface HeaderBarProps {
     onNavigate?: (lat: number, lng: number, zoom: number) => void;
-    vessels?: MapVessel[];
-    onSelectVessel?: (vessel: MapVessel | null) => void;
+    trackedVessels?: MapVessel[];
+    onVesselSelect?: (vessel: MapVessel | null) => void;
     selectedVesselName?: string;
     showClusterZoomNotice?: boolean;
 }
@@ -188,8 +188,8 @@ const parseVesselCoords = (input: string): Coordinates | null => {
 
 export default function HeaderBar({
     onNavigate,
-    vessels = [],
-    onSelectVessel,
+    trackedVessels = [],
+    onVesselSelect,
     selectedVesselName,
     showClusterZoomNotice = false,
 }: HeaderBarProps) {
@@ -207,7 +207,7 @@ export default function HeaderBar({
     const activeQuery = selectedVesselName ?? query;
 
     const allResults = useMemo(() => {
-        const liveVessels: Vessel[] = vessels.map((v) => ({
+        const liveVessels: Vessel[] = trackedVessels.map((v) => ({
             category: 'vessel' as const,
             name: v.name || 'UNKNOWN',
             mmsi: String(v.mmsi),
@@ -223,7 +223,7 @@ export default function HeaderBar({
             ...WORLD_CONTINENTS,
             ...WORLD_OCEANS,
         ];
-    }, [vessels]);
+    }, [trackedVessels]);
 
     const suggestions = useMemo(() => {
         const q = activeQuery.toUpperCase().trim();
@@ -276,9 +276,11 @@ export default function HeaderBar({
 
     const handleSelect = (item: SearchResult) => {
         if (item.category === 'vessel') {
-            if (onSelectVessel) {
-                const originalVessel = vessels.find((v) => String(v.mmsi) === item.mmsi);
-                onSelectVessel(originalVessel || null);
+            if (onVesselSelect) {
+                const originalVessel = trackedVessels.find(
+                    (v: MapVessel) => String(v.mmsi) === item.mmsi
+                );
+                onVesselSelect(originalVessel || null);
             }
         }
 
@@ -375,8 +377,8 @@ export default function HeaderBar({
                         type="text"
                         value={activeQuery}
                         onChange={(e) => {
-                            if (selectedVesselName && onSelectVessel) {
-                                onSelectVessel(null);
+                            if (selectedVesselName && onVesselSelect) {
+                                onVesselSelect(null);
                             }
                             setQuery(e.target.value);
                             setCategoryLimits({
