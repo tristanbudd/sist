@@ -3,6 +3,7 @@ import { Head } from '@inertiajs/react';
 import MainLayout from '../Layouts/MainLayout';
 import HeaderBar from '../Components/HeaderBar';
 import MapDisplay, { Vessel } from '../Components/MapDisplay';
+import ShipDetailsSidebar from '../Components/ShipDetailsSidebar';
 
 interface FleetStats {
     renderedIcons: number;
@@ -84,6 +85,7 @@ export default function Index() {
                 onVesselSelect={handleSelectVessel}
                 onClusterZoomNotice={handleClusterZoomNotice}
             />
+            <ShipDetailsSidebar vessel={selectedVessel} onClose={() => handleSelectVessel(null)} />
         </MainLayout>
     );
 }

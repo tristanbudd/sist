@@ -276,7 +276,6 @@ export default function HeaderBar({
 
     const handleSelect = (item: SearchResult) => {
         if (item.category === 'vessel') {
-            console.info(`FLEET_INTEL: Vessel Search Selection [MMSI: ${item.mmsi}]`);
             if (onSelectVessel) {
                 const originalVessel = vessels.find((v) => String(v.mmsi) === item.mmsi);
                 onSelectVessel(originalVessel || null);

@@ -38,6 +38,7 @@ class Vessel extends Model
         'registry_continent',
         'registry_local_time',
         'registry_timezone',
+        'position_age_seconds',
     ];
 
     public function positions(): HasMany
@@ -135,6 +136,13 @@ class Vessel extends Model
             get: function () {
                 return MaritimeIdentityService::getFlagData($this->mmsi)['tz'];
             }
+        );
+    }
+
+    protected function positionAgeSeconds(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->last_seen_at ? now()->diffInSeconds($this->last_seen_at) : null
         );
     }
 
