@@ -592,7 +592,18 @@ export default function ShipDetailsSidebar({
                                         </span>
                                     </div>
                                     <button
-                                        onClick={() => onShowHistoryChange?.(!showHistory)}
+                                        onClick={() => {
+                                            const newVal = !showHistory;
+                                            onShowHistoryChange?.(newVal);
+                                            // @ts-expect-error - GTM dataLayer
+                                            window.dataLayer = window.dataLayer || [];
+                                            // @ts-expect-error - GTM dataLayer
+                                            window.dataLayer.push({
+                                                event: 'trajectory_toggle',
+                                                trajectory_enabled: newVal,
+                                                vessel_mmsi: vessel.mmsi,
+                                            });
+                                        }}
                                         className={`relative inline-flex h-5 w-9 items-center transition-colors focus:outline-none ${
                                             showHistory ? 'bg-zinc-100' : 'bg-zinc-800'
                                         }`}

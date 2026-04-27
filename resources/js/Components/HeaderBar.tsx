@@ -275,6 +275,15 @@ export default function HeaderBar({
     const showSuggestionsPanel = showSuggestions && !error && suggestions.length > 0;
 
     const handleSelect = (item: SearchResult) => {
+        // @ts-expect-error - GTM dataLayer
+        window.dataLayer = window.dataLayer || [];
+        // @ts-expect-error - GTM dataLayer
+        window.dataLayer.push({
+            event: 'search_select',
+            search_item_name: item.name,
+            search_item_category: item.category,
+        });
+
         if (item.category === 'vessel') {
             if (onVesselSelect) {
                 const originalVessel = trackedVessels.find(

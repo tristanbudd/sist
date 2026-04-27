@@ -59,6 +59,17 @@ export default function Index() {
     const handleSelectVessel = useCallback((vessel: Vessel | null) => {
         setSelectedVessel(vessel);
         setHistoryData([]);
+
+        if (vessel) {
+            // @ts-expect-error - GTM dataLayer
+            window.dataLayer = window.dataLayer || [];
+            // @ts-expect-error - GTM dataLayer
+            window.dataLayer.push({
+                event: 'vessel_select',
+                vessel_mmsi: vessel.mmsi,
+                vessel_name: vessel.name,
+            });
+        }
     }, []);
 
     const handleClusterZoomNotice = useCallback(() => {

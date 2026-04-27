@@ -1,10 +1,21 @@
 import '../css/app.css';
 import './bootstrap';
 
-import { createInertiaApp } from '@inertiajs/react';
+import { createInertiaApp, router } from '@inertiajs/react';
 import { createRoot } from 'react-dom/client';
 
 const appName = import.meta.env.VITE_APP_NAME || 'SIST';
+
+router.on('navigate', (event) => {
+    // @ts-expect-error - GTM dataLayer
+    window.dataLayer = window.dataLayer || [];
+    // @ts-expect-error - GTM dataLayer
+    window.dataLayer.push({
+        event: 'inertia_navigate',
+        page_path: event.detail.page.url,
+        page_title: document.title,
+    });
+});
 
 const pages = import.meta.glob('./Pages/**/*.tsx', { eager: true });
 
