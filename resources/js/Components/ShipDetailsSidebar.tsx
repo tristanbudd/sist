@@ -533,8 +533,8 @@ export default function ShipDetailsSidebar({
                                         <a
                                             href={
                                                 s.source === 'sanctions_network'
-                                                    ? 'https://sanctionsnetwork.org'
-                                                    : '#'
+                                                    ? 'https://sanctions.network/'
+                                                    : 'https://fleetleaks.com/'
                                             }
                                             target="_blank"
                                             rel="noopener noreferrer"
