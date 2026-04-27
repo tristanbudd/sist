@@ -253,6 +253,12 @@ function FleetLayer({
             recordActivity();
             debouncedFetch();
         },
+        popupclose: () => {
+            suppressNextMapClickRef.current = true;
+            setTimeout(() => {
+                suppressNextMapClickRef.current = false;
+            }, 100);
+        },
         click: (e) => {
             recordActivity();
             const target = e.originalEvent?.target as HTMLElement | null;
