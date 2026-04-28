@@ -1,9 +1,11 @@
 {
-  "recommendations": [
-    "esbenp.prettier-vscode",
-    "dbaeumer.vscode-eslint",
-    "open-southeners.laravel-pint",
-    "bradlc.vscode-tailwindcss",
-    "bmewburn.vscode-intelephense-client"
-  ]
+    "recommendations": [
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint",
+        "open-southeners.laravel-pint",
+        "bradlc.vscode-tailwindcss",
+        "bmewburn.vscode-intelephense-client",
+        "github.vscode-github-actions",
+        "GitHub.vscode-pull-request-github"
+    ]
 }
