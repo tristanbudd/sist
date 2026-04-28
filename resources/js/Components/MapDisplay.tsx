@@ -1096,6 +1096,29 @@ function TrajectoryLayer({
 
     const path = positions.map((p) => [Number(p.lat), Number(p.lng)] as [number, number]);
 
+    const createWaypointIcon = (course: number) => {
+        return L.divIcon({
+            className: 'waypoint-icon-container',
+            html: `
+                <div style="transform: rotate(${course}deg); display: flex; align-items: center; justify-content: center; opacity: 0.8;">
+                    ${renderToString(
+                        <FaLocationArrow
+                            style={{
+                                color: '#f4f4f5',
+                                width: '10px',
+                                height: '10px',
+                                transform: 'rotate(-45deg)',
+                                filter: 'drop-shadow(0 0 1px black)',
+                            }}
+                        />
+                    )}
+                </div>
+            `,
+            iconSize: [14, 14],
+            iconAnchor: [7, 7],
+        });
+    };
+
     return (
         <>
             <Polyline
@@ -1109,16 +1132,10 @@ function TrajectoryLayer({
             />
             {showWaypoints &&
                 merged.map((p, i) => (
-                    <CircleMarker
+                    <Marker
                         key={`${p.recorded_at}-${i}`}
-                        center={[Number(p.lat), Number(p.lng)]}
-                        radius={3}
-                        pathOptions={{
-                            fillColor: '#f4f4f5',
-                            fillOpacity: 0.8,
-                            color: '#09090b',
-                            weight: 1,
-                        }}
+                        position={[Number(p.lat), Number(p.lng)]}
+                        icon={createWaypointIcon(Number(p.course) || 0)}
                     >
                         <Popup closeButton={false} minWidth={220} className="sist-popup">
                             <div className="bg-zinc-950 border border-white/20 shadow-2xl p-4 min-w-[220px]">
@@ -1170,7 +1187,7 @@ function TrajectoryLayer({
                                 </div>
                             </div>
                         </Popup>
-                    </CircleMarker>
+                    </Marker>
                 ))}
         </>
     );

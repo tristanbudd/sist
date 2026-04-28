@@ -1132,8 +1132,20 @@ export default function ShipDetailsSidebar({
                                                     const mins = Math.floor(absSec / 60);
                                                     return `${mins} minute${mins !== 1 ? 's' : ''} ago`;
                                                 }
-                                                const hours = Math.floor(absSec / 3600);
-                                                return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+                                                if (absSec < 86400) {
+                                                    const hours = Math.floor(absSec / 3600);
+                                                    return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+                                                }
+                                                if (absSec < 604800) {
+                                                    const days = Math.floor(absSec / 86400);
+                                                    return `${days} day${days !== 1 ? 's' : ''} ago`;
+                                                }
+                                                if (absSec < 2592000) {
+                                                    const weeks = Math.floor(absSec / 604800);
+                                                    return `${weeks} week${weeks !== 1 ? 's' : ''} ago`;
+                                                }
+                                                const months = Math.floor(absSec / 2592000);
+                                                return `${months} month${months !== 1 ? 's' : ''} ago`;
                                             })()
                                           : 'N/A'}
                                 </span>
