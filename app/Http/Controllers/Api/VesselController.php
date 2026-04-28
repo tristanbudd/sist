@@ -210,7 +210,7 @@ class VesselController extends Controller
      * "mmsi": 235000123
      * }
      */
-    public function history(Request $request, $mmsi): JsonResponse
+    public function history(Request $request, string $mmsi): JsonResponse
     {
         if (! Vessel::where('mmsi', $mmsi)->exists()) {
             return response()->json([

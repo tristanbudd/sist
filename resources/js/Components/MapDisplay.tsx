@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef, ReactNode } from 'react';
 import { renderToString } from 'react-dom/server';
 import {
     MapContainer,
@@ -77,7 +77,6 @@ function normalizeVessels(raw: Vessel[]): Vessel[] {
     for (const vessel of raw) {
         const trimmedName = (vessel.name || '').trim().toUpperCase();
 
-        // Ignore ships with placeholder names
         if (!trimmedName || IGNORED_VESSEL_NAMES.includes(trimmedName)) {
             continue;
         }
@@ -133,14 +132,14 @@ function FleetLayer({
     const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const trackedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
-    const [lastActivity, setLastActivity] = useState(Date.now());
+    const [lastActivity, setLastActivity] = useState(() => Date.now());
     const [isIdle, setIsIdle] = useState(false);
     const suppressNextMapClickRef = useRef(false);
     const lastClusterInteractionRef = useRef<{ mmsi: number; at: number } | null>(null);
     const IDLE_THRESHOLD = 120000;
 
     const recordActivity = useCallback(() => {
-        setLastActivity(Date.now());
+        setLastActivity(() => Date.now());
         if (isIdle) setIsIdle(false);
     }, [isIdle]);
 
@@ -157,7 +156,6 @@ function FleetLayer({
 
             const bounds = map.getBounds();
             const currentZoom = map.getZoom();
-            setZoom(currentZoom);
 
             try {
                 // TODO: Change to relative path once finished with dev
@@ -171,6 +169,7 @@ function FleetLayer({
                         age_minutes: 60,
                     },
                 });
+                setZoom(currentZoom);
                 const data = normalizeVessels(response.data.data || []);
                 setWindowVessels(data);
             } catch (error) {
@@ -289,8 +288,12 @@ function FleetLayer({
     }, [lastActivity]);
 
     useEffect(() => {
-        fetchWindowVessels(true);
-        fetchTrackedSearchVessels();
+        const initializeMapData = async () => {
+            await fetchWindowVessels(true);
+            await fetchTrackedSearchVessels();
+        };
+
+        initializeMapData();
 
         pollTimer.current = setInterval(() => fetchWindowVessels(), 15000);
         trackedTimer.current = setInterval(() => fetchTrackedSearchVessels(), 300000);
@@ -482,21 +485,24 @@ function FleetLayer({
         });
     };
 
-    const handleClusterInteraction = (vessel: ClusteredVessel) => {
-        const now = Date.now();
-        const last = lastClusterInteractionRef.current;
-        if (last && last.mmsi === vessel.mmsi && now - last.at < 250) return;
-        lastClusterInteractionRef.current = { mmsi: vessel.mmsi, at: now };
+    const handleClusterInteraction = useCallback(
+        (vessel: ClusteredVessel) => {
+            const now = Date.now();
+            const last = lastClusterInteractionRef.current;
+            if (last && last.mmsi === vessel.mmsi && now - last.at < 250) return;
+            lastClusterInteractionRef.current = { mmsi: vessel.mmsi, at: now };
 
-        suppressNextMapClickRef.current = true;
-        if (onVesselSelect) onVesselSelect(null);
-        if (onClusterZoomNotice) onClusterZoomNotice();
-        const nextZoom = Math.min(Math.max(map.getZoom() + 2, 11), 14);
-        map.flyTo([vessel.lat, vessel.lng], nextZoom, {
-            duration: 0.7,
-            easeLinearity: 0.25,
-        });
-    };
+            suppressNextMapClickRef.current = true;
+            if (onVesselSelect) onVesselSelect(null);
+            if (onClusterZoomNotice) onClusterZoomNotice();
+            const nextZoom = Math.min(Math.max(map.getZoom() + 2, 11), 14);
+            map.flyTo([vessel.lat, vessel.lng], nextZoom, {
+                duration: 0.7,
+                easeLinearity: 0.25,
+            });
+        },
+        [map, onVesselSelect, onClusterZoomNotice]
+    );
 
     const handleMarkerClick = (vessel: ClusteredVessel, e: L.LeafletMouseEvent) => {
         if (vessel.isCluster) {
@@ -987,6 +993,7 @@ interface MapDisplayProps {
     historyPositions?: HistoryPosition[];
     showHistory?: boolean;
     showWaypoints?: boolean;
+    selectedWaypointKey?: string | null;
     sidebarOpen?: boolean;
 }
 
@@ -1000,6 +1007,7 @@ export default function MapDisplay({
     historyPositions = [],
     showHistory = false,
     showWaypoints = true,
+    selectedWaypointKey = null,
     sidebarOpen = false,
 }: MapDisplayProps) {
     const [showVessels, setShowVessels] = useState(true);
@@ -1037,6 +1045,7 @@ export default function MapDisplay({
                     positions={historyPositions}
                     show={showHistory}
                     showWaypoints={showWaypoints}
+                    selectedWaypointKey={selectedWaypointKey}
                 />
                 <MapViewHandler center={center} zoom={zoom} />
                 <ZoomControls />
@@ -1054,14 +1063,67 @@ export default function MapDisplay({
         </div>
     );
 }
+function WaypointMarker({
+    p,
+    isSelected,
+    createWaypointIcon,
+    children,
+}: {
+    p: HistoryPosition & { mergedCount: number };
+    isSelected: boolean;
+    createWaypointIcon: (course: number) => L.DivIcon;
+    children: ReactNode;
+}) {
+    const markerRef = useRef<L.Marker | L.CircleMarker>(null);
+
+    useEffect(() => {
+        if (isSelected && markerRef.current) {
+            const timer = setTimeout(() => {
+                markerRef.current?.openPopup();
+            }, 50);
+            return () => clearTimeout(timer);
+        }
+    }, [isSelected]);
+
+    if (p.mergedCount > 1) {
+        return (
+            <CircleMarker
+                ref={markerRef as React.Ref<L.CircleMarker>}
+                center={[Number(p.lat), Number(p.lng)]}
+                radius={4}
+                pathOptions={{
+                    fillColor: '#f4f4f5',
+                    fillOpacity: 0.8,
+                    color: '#09090b',
+                    weight: 1,
+                }}
+            >
+                {children}
+            </CircleMarker>
+        );
+    }
+
+    return (
+        <Marker
+            ref={markerRef as React.Ref<L.Marker>}
+            position={[Number(p.lat), Number(p.lng)]}
+            icon={createWaypointIcon(Number(p.course) || 0)}
+        >
+            {children}
+        </Marker>
+    );
+}
+
 function TrajectoryLayer({
     positions,
     show,
     showWaypoints,
+    selectedWaypointKey,
 }: {
     positions: HistoryPosition[];
     show: boolean;
     showWaypoints: boolean;
+    selectedWaypointKey?: string | null;
 }) {
     const merged = useMemo(() => {
         if (!show || !positions || positions.length === 0) return [];
@@ -1089,6 +1151,21 @@ function TrajectoryLayer({
 
     const path = positions.map((p) => [Number(p.lat), Number(p.lng)] as [number, number]);
 
+    const createWaypointIcon = (course: number) => {
+        return L.divIcon({
+            className: 'waypoint-icon-container',
+            html: `
+                <div style="transform: rotate(${course}deg); display: flex; align-items: center; justify-content: center; opacity: 0.8;">
+                    <svg viewBox="0 0 448 512" style="width: 12px; height: 12px; transform: rotate(-45deg); filter: drop-shadow(0 0 1px black);" fill="#f4f4f5">
+                        <path d="M429.6 92.1c4.9-11.9 2.1-25.6-7-34.7s-22.8-11.9-34.7-7l-352 144c-14.2 5.8-22.2 20.8-19.3 35.8s16.1 25.8 31.4 25.8H224V432c0 15.3 10.8 28.4 25.8 31.4s30-5.1 35.8-19.3l144-352z"/>
+                    </svg>
+                </div>
+            `,
+            iconSize: [16, 16],
+            iconAnchor: [8, 8],
+        });
+    };
+
     return (
         <>
             <Polyline
@@ -1101,70 +1178,66 @@ function TrajectoryLayer({
                 }}
             />
             {showWaypoints &&
-                merged.map((p, i) => (
-                    <CircleMarker
-                        key={`${p.recorded_at}-${i}`}
-                        center={[Number(p.lat), Number(p.lng)]}
-                        radius={3}
-                        pathOptions={{
-                            fillColor: '#f4f4f5',
-                            fillOpacity: 0.8,
-                            color: '#09090b',
-                            weight: 1,
-                        }}
-                    >
-                        <Popup closeButton={false} minWidth={220} className="sist-popup">
-                            <div className="bg-zinc-950 border border-white/20 shadow-2xl p-4 min-w-[220px]">
-                                <div className="flex flex-col gap-1 border-b border-white/10 pb-2 mb-2">
-                                    <span className="font-bold text-[10px] uppercase tracking-[0.2em] text-zinc-200">
-                                        {p.mergedCount > 1 ? 'Stationary Block' : 'Waypoint Detail'}
-                                    </span>
-                                    <span className="text-[10px] font-mono text-zinc-500">
-                                        {new Date(p.recorded_at).toLocaleTimeString('en-GB', {
-                                            hour: '2-digit',
-                                            minute: '2-digit',
-                                            day: '2-digit',
-                                            month: 'short',
-                                            timeZone: 'Europe/London',
-                                        })}
-                                    </span>
-                                </div>
-
-                                {p.mergedCount > 1 && (
-                                    <div className="text-[9px] text-zinc-500 font-black uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                                        <FaLayerGroup className="w-2.5 h-2.5 text-zinc-600" />
-                                        {p.mergedCount} Records in this area
-                                    </div>
-                                )}
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="flex flex-col gap-0.5">
-                                        <span className="text-[8px] text-zinc-600 uppercase font-black tracking-tighter">
-                                            Speed
+                merged
+                    .filter((p) => !p.isLatest)
+                    .map((p, i) => (
+                        <WaypointMarker
+                            key={`${p.recorded_at}-${i}`}
+                            p={p}
+                            isSelected={selectedWaypointKey === p.recorded_at}
+                            createWaypointIcon={createWaypointIcon}
+                        >
+                            <Popup closeButton={false} minWidth={220} className="sist-popup">
+                                <div className="bg-zinc-950 border border-white/20 shadow-2xl p-4 min-w-[220px]">
+                                    <div className="flex flex-col gap-1 border-b border-white/10 pb-2 mb-2">
+                                        <span className="font-bold text-[10px] uppercase tracking-[0.2em] text-zinc-200">
+                                            {p.mergedCount > 1
+                                                ? 'Stationary Block'
+                                                : 'Waypoint Detail'}
                                         </span>
-                                        <span className="text-[11px] font-black text-zinc-300">
-                                            {Number(p.speed).toFixed(1)} kn
+                                        <span className="text-[10px] font-mono text-zinc-500">
+                                            {new Date(p.recorded_at).toLocaleTimeString('en-GB', {
+                                                hour: '2-digit',
+                                                minute: '2-digit',
+                                                day: '2-digit',
+                                                month: 'short',
+                                                timeZone: 'Europe/London',
+                                            })}
                                         </span>
                                     </div>
-                                    <div className="flex flex-col gap-0.5 text-right">
-                                        <span className="text-[8px] text-zinc-600 uppercase font-black tracking-tighter">
-                                            Course
-                                        </span>
-                                        <span className="text-[11px] font-black text-zinc-300">
-                                            {Number(p.course).toFixed(0)}°
+                                    {p.mergedCount > 1 && (
+                                        <div className="text-[9px] text-zinc-500 font-black uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                                            <FaLayerGroup className="w-2.5 h-2.5 text-zinc-600" />
+                                            {p.mergedCount} Records in this area
+                                        </div>
+                                    )}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="flex flex-col gap-0.5">
+                                            <span className="text-[8px] text-zinc-600 uppercase font-black tracking-tighter">
+                                                Speed
+                                            </span>
+                                            <span className="text-[11px] font-black text-zinc-300">
+                                                {Number(p.speed).toFixed(1)} kn
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-col gap-0.5 text-right">
+                                            <span className="text-[8px] text-zinc-600 uppercase font-black tracking-tighter">
+                                                Course
+                                            </span>
+                                            <span className="text-[11px] font-black text-zinc-300">
+                                                {Number(p.course).toFixed(0)}°
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="mt-3 pt-2 border-t border-white/5 flex items-center justify-between">
+                                        <span className="text-[9px] text-zinc-600 font-mono">
+                                            {Number(p.lat).toFixed(4)}, {Number(p.lng).toFixed(4)}
                                         </span>
                                     </div>
                                 </div>
-
-                                <div className="mt-3 pt-2 border-t border-white/5 flex items-center justify-between">
-                                    <span className="text-[9px] text-zinc-600 font-mono">
-                                        {Number(p.lat).toFixed(4)}, {Number(p.lng).toFixed(4)}
-                                    </span>
-                                </div>
-                            </div>
-                        </Popup>
-                    </CircleMarker>
-                ))}
+                            </Popup>
+                        </WaypointMarker>
+                    ))}
         </>
     );
 }

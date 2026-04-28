@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, ReactNode } from 'react';
 import {
     FaXmark,
     FaLocationDot,
@@ -14,6 +14,7 @@ import {
     FaArrowRight,
     FaCircleExclamation,
     FaChevronDown,
+    FaImage,
 } from 'react-icons/fa6';
 import { LuAnchor, LuWaves, LuThermometer } from 'react-icons/lu';
 import axios from 'axios';
@@ -113,6 +114,12 @@ interface HistoryPosition {
     isLatest?: boolean;
 }
 
+interface ExternalLink {
+    source: string;
+    url: string;
+    icon: string;
+}
+
 interface ShipDetailsSidebarProps {
     vessel: Vessel | null;
     onClose: () => void;
@@ -122,6 +129,8 @@ interface ShipDetailsSidebarProps {
     onNavigate?: (lat: number, lng: number, zoom: number) => void;
     showWaypoints?: boolean;
     onShowWaypointsChange?: (show: boolean) => void;
+    onWaypointSelect?: (pos: HistoryPosition) => void;
+    selectedWaypointKey?: string | null;
 }
 
 export default function ShipDetailsSidebar({
@@ -133,13 +142,16 @@ export default function ShipDetailsSidebar({
     onNavigate,
     showWaypoints = true,
     onShowWaypointsChange,
+    onWaypointSelect,
+    selectedWaypointKey,
 }: ShipDetailsSidebarProps) {
+    const abortControllerRef = useRef<AbortController | null>(null);
     const [details, setDetails] = useState<VesselDetails | null>(null);
     const [weather, setWeather] = useState<WeatherData | null>(null);
     const [tides, setTides] = useState<TideData | null>(null);
     const [sanctions, setSanctions] = useState<SanctionsData | null>(null);
     const [history, setHistory] = useState<HistoryPosition[]>([]);
-    const [historyHours, setHistoryHours] = useState(24);
+    const [historyHours, setHistoryHours] = useState(1);
     const [waypointsLimit, setWaypointsLimit] = useState(10);
     const [hasEnvError, setHasEnvError] = useState(false);
     const [isMinimized, setIsMinimized] = useState(false);
@@ -157,19 +169,20 @@ export default function ShipDetailsSidebar({
         history: false,
     });
 
-    useEffect(() => {
-        setIsMinimized(false);
-    }, [vessel?.mmsi]);
+    const [lastMmsi, setLastMmsi] = useState<number | null>(null);
 
-    const fetchAllData = useCallback(
-        async (mmsi: number) => {
-            setDetails(null);
-            setWeather(null);
-            setTides(null);
-            setSanctions(null);
-            setWaypointsLimit(10);
-            setHasEnvError(false);
-            setHistory([]);
+    const currentMmsi = vessel?.mmsi ?? null;
+    if (currentMmsi !== lastMmsi) {
+        setLastMmsi(currentMmsi);
+        setDetails(null);
+        setWeather(null);
+        setTides(null);
+        setSanctions(null);
+        setHistory([]);
+        setWaypointsLimit(10);
+        setHasEnvError(false);
+        setIsMinimized(false);
+        if (vessel) {
             setLoading({
                 details: true,
                 weather: true,
@@ -177,46 +190,67 @@ export default function ShipDetailsSidebar({
                 sanctions: true,
                 history: true,
             });
+        }
+    }
 
+    const [lastHistoryHours, setLastHistoryHours] = useState(historyHours);
+    if (historyHours !== lastHistoryHours) {
+        setLastHistoryHours(historyHours);
+        setLoading((prev) => ({ ...prev, history: true }));
+    }
+
+    const fetchAllData = useCallback(
+        async (mmsi: number, signal?: AbortSignal) => {
             // TODO: Set API links back to relative paths after development
             let detailsData: VesselDetails | null = null;
             try {
-                const res = await axios.get(`https://sist.tristanbudd.com/api/vessels/${mmsi}`);
+                const res = await axios.get(`https://sist.tristanbudd.com/api/vessels/${mmsi}`, {
+                    signal,
+                });
                 detailsData = res.data;
                 setDetails(detailsData);
             } catch (err) {
                 console.error('Failed to fetch vessel details:', err);
             } finally {
-                setLoading((prev) => ({ ...prev, details: false }));
+                if (!signal?.aborted) {
+                    setLoading((prev) => ({ ...prev, details: false }));
+                }
             }
 
             try {
                 const res = await axios.get(
-                    `https://sist.tristanbudd.com/api/conditions/weather/${mmsi}`
+                    `https://sist.tristanbudd.com/api/conditions/weather/${mmsi}`,
+                    { signal }
                 );
                 setWeather(res.data);
             } catch (err) {
                 console.error('Failed to fetch weather:', err);
                 setHasEnvError(true);
             } finally {
-                setLoading((prev) => ({ ...prev, weather: false }));
+                if (!signal?.aborted) {
+                    setLoading((prev) => ({ ...prev, weather: false }));
+                }
             }
 
             try {
                 const res = await axios.get(
-                    `https://sist.tristanbudd.com/api/conditions/tides/${mmsi}`
+                    `https://sist.tristanbudd.com/api/conditions/tides/${mmsi}`,
+                    { signal }
                 );
                 setTides(res.data);
             } catch (err) {
                 console.error('Failed to fetch tides:', err);
                 setHasEnvError(true);
             } finally {
-                setLoading((prev) => ({ ...prev, tides: false }));
+                if (!signal?.aborted) {
+                    setLoading((prev) => ({ ...prev, tides: false }));
+                }
             }
 
             try {
                 const res = await axios.get(
-                    `https://sist.tristanbudd.com/api/vessels/${mmsi}/sanctions`
+                    `https://sist.tristanbudd.com/api/vessels/${mmsi}/sanctions`,
+                    { signal }
                 );
                 const sanctionsData = res.data;
 
@@ -228,13 +262,17 @@ export default function ShipDetailsSidebar({
             } catch (err) {
                 console.error('Failed to fetch sanctions:', err);
             } finally {
-                setLoading((prev) => ({ ...prev, sanctions: false }));
+                if (!signal?.aborted) {
+                    setLoading((prev) => ({ ...prev, sanctions: false }));
+                }
             }
 
             try {
-                setLoading((prev) => ({ ...prev, history: true }));
                 const res = await axios.get(
-                    `https://sist.tristanbudd.com/api/vessels/${mmsi}/history?hours=${historyHours}`
+                    `https://sist.tristanbudd.com/api/vessels/${mmsi}/history?hours=${historyHours}`,
+                    {
+                        signal,
+                    }
                 );
                 let data = res.data.history || [];
 
@@ -272,11 +310,60 @@ export default function ShipDetailsSidebar({
             } catch (err) {
                 console.error('Failed to fetch history:', err);
             } finally {
-                setLoading((prev) => ({ ...prev, history: false }));
+                if (!signal?.aborted) {
+                    setLoading((prev) => ({ ...prev, history: false }));
+                }
             }
         },
         [historyHours, onHistoryUpdate]
     );
+
+    const generatedLinks = useMemo<ExternalLink[]>(() => {
+        if (!vessel) return [];
+        const mmsi = vessel.mmsi;
+        const imo = details?.imo || vessel.imo;
+
+        return [
+            {
+                source: 'MarineTraffic (COM)',
+                url: imo
+                    ? `https://www.marinetraffic.com/en/ais/details/ships/imo:${imo}`
+                    : `https://www.marinetraffic.com/en/ais/details/ships/mmsi:${mmsi}`,
+                icon: 'marinetraffic',
+            },
+            {
+                source: 'VesselFinder',
+                url: imo
+                    ? `https://www.vesselfinder.com/vessels/details/${imo}`
+                    : `https://www.vesselfinder.com/vessels?name=${mmsi}`,
+                icon: 'vesselfinder',
+            },
+            {
+                source: 'VesselTracker',
+                url: imo
+                    ? `https://www.vesseltracker.com/en/Ships/${imo}.html`
+                    : `https://www.vesseltracker.com/en/vessels.html?search=${mmsi}`,
+                icon: 'vesseltracker',
+            },
+            {
+                source: 'MarineTraffic (ORG)',
+                url: `https://www.marinetraffic.org/vessels?vessel=${imo || mmsi}`,
+                icon: 'marinetraffic_org',
+            },
+            {
+                source: 'ShipSpotting',
+                url: imo
+                    ? `https://www.shipspotting.com/photos/gallery?imo=${imo}`
+                    : `https://www.shipspotting.com/photos/gallery?mmsi=${mmsi}`,
+                icon: 'shipspotting',
+            },
+            {
+                source: 'MyShipTracking',
+                url: `https://www.myshiptracking.com/vessels/mmsi-${mmsi}`,
+                icon: 'myshiptracking',
+            },
+        ];
+    }, [vessel, details]);
 
     const mergedHistory = useMemo(() => {
         if (history.length === 0) return [];
@@ -294,7 +381,7 @@ export default function ShipDetailsSidebar({
                     Math.pow(Number(pos.lng) - Number(last.lng), 2)
             );
 
-            if (!pos.isLatest && !last.isLatest && dist < 0.0005) {
+            if (dist < 0.0005) {
                 last.mergedCount++;
             } else {
                 result.push({ ...pos, mergedCount: 1 });
@@ -305,12 +392,23 @@ export default function ShipDetailsSidebar({
 
     useEffect(() => {
         if (vessel) {
-            fetchAllData(vessel.mmsi);
-        } else {
-            setDetails(null);
-            setWeather(null);
-            setTides(null);
-            setSanctions(null);
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+            const controller = new AbortController();
+            abortControllerRef.current = controller;
+
+            const loadData = async () => {
+                try {
+                    await fetchAllData(vessel.mmsi, controller.signal);
+                } catch (e) {
+                    if (axios.isCancel(e)) return;
+                    console.error('Data fetch aborted or failed:', e);
+                }
+            };
+            loadData();
+
+            return () => controller.abort();
         }
     }, [vessel, fetchAllData]);
 
@@ -388,8 +486,45 @@ export default function ShipDetailsSidebar({
                             <StatusCard
                                 label="Nav Status"
                                 value={
-                                    details?.nav_status_text ||
-                                    (loading.details ? '...' : 'Underway')
+                                    loading.details
+                                        ? '...'
+                                        : (() => {
+                                              const s = details?.navigational_status;
+                                              switch (s) {
+                                                  case 0:
+                                                      return 'Underway';
+                                                  case 1:
+                                                      return 'Anchored';
+                                                  case 2:
+                                                      return 'NUC';
+                                                  case 3:
+                                                      return 'Restricted';
+                                                  case 4:
+                                                      return 'Constrained';
+                                                  case 5:
+                                                      return 'Moored';
+                                                  case 6:
+                                                      return 'Aground';
+                                                  case 7:
+                                                      return 'Fishing';
+                                                  case 8:
+                                                      return 'Sailing';
+                                                  case 9:
+                                                      return 'HSC';
+                                                  case 10:
+                                                      return 'WIG';
+                                                  case 11:
+                                                      return 'Towing';
+                                                  case 12:
+                                                      return 'Pushing';
+                                                  case 13:
+                                                      return 'Reserved';
+                                                  case 14:
+                                                      return 'SART Active';
+                                                  default:
+                                                      return 'Not Defined';
+                                              }
+                                          })()
                                 }
                                 icon={<LuAnchor className="text-zinc-500" />}
                             />
@@ -558,8 +693,12 @@ export default function ShipDetailsSidebar({
                                                 }
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="text-[9px] text-zinc-500 font-bold uppercase hover:text-zinc-300 transition-colors underline decoration-zinc-700 underline-offset-2 shrink-0"
+                                                className="flex items-center gap-1.5 text-[9px] text-zinc-500 font-bold uppercase hover:text-zinc-300 transition-colors underline decoration-zinc-700 underline-offset-2 shrink-0"
                                             >
+                                                <ExternalProviderIcon
+                                                    name={s.source}
+                                                    className="w-3 h-3"
+                                                />
                                                 {s.source.replace('_', ' ')}
                                             </a>
                                         </div>
@@ -588,7 +727,7 @@ export default function ShipDetailsSidebar({
                                             Trajectory Visualization
                                         </span>
                                         <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-tight">
-                                            Map Overlay breadcrumbs
+                                            Historical voyage path visualization
                                         </span>
                                     </div>
                                     <button
@@ -619,156 +758,200 @@ export default function ShipDetailsSidebar({
                                 </div>
 
                                 {showHistory && (
-                                    <div className="flex items-center justify-between border-t border-white/5 pt-4">
-                                        <div className="flex flex-col">
-                                            <span className="text-[11px] font-bold text-zinc-300">
-                                                Show Point Markers
-                                            </span>
-                                            <span className="text-[9px] text-zinc-500 uppercase font-bold tracking-tight">
-                                                Individual position dots
-                                            </span>
-                                        </div>
-                                        <button
-                                            onClick={() => onShowWaypointsChange?.(!showWaypoints)}
-                                            className={`relative inline-flex h-4 w-7 items-center transition-colors focus:outline-none ${
-                                                showWaypoints ? 'bg-zinc-400' : 'bg-zinc-800'
-                                            }`}
-                                        >
-                                            <span
-                                                className={`inline-block h-2 w-2 transform transition-transform ${
-                                                    showWaypoints
-                                                        ? 'translate-x-4 bg-white'
-                                                        : 'translate-x-1 bg-zinc-600'
-                                                }`}
-                                            />
-                                        </button>
-                                    </div>
-                                )}
-
-                                <div className="space-y-2">
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-tight">
-                                            History Window
-                                        </span>
-                                        <span className="text-[10px] text-zinc-200 font-mono">
-                                            {historyHours} Hours
-                                        </span>
-                                    </div>
-                                    <input
-                                        type="range"
-                                        min="6"
-                                        max="168"
-                                        step="6"
-                                        value={historyHours}
-                                        onChange={(e) => setHistoryHours(parseInt(e.target.value))}
-                                        className="w-full h-1 bg-zinc-800 appearance-none cursor-pointer accent-white"
-                                    />
-                                    <div className="flex justify-between text-[8px] text-zinc-600 font-black uppercase tracking-widest">
-                                        <span>6h</span>
-                                        <span>24h</span>
-                                        <span>7d</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {history.length > 0 && (
-                                <div className="space-y-1.5">
-                                    <div className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-1">
-                                        Recent Waypoints
-                                    </div>
-                                    <div className="max-h-[300px] overflow-y-auto custom-scrollbar space-y-1 pr-1">
-                                        {mergedHistory
-                                            .slice(0, waypointsLimit)
-                                            .map(
-                                                (
-                                                    pos: HistoryPosition & { mergedCount: number },
-                                                    i: number
-                                                ) => (
-                                                    <div
-                                                        key={i}
-                                                        onClick={() =>
-                                                            onNavigate?.(
-                                                                Number(pos.lat),
-                                                                Number(pos.lng),
-                                                                14
-                                                            )
-                                                        }
-                                                        className="bg-white/5 border border-white/5 p-2 flex items-center justify-between group hover:bg-white/10 transition-colors cursor-pointer"
-                                                    >
-                                                        <div className="flex flex-col">
-                                                            <div className="flex items-center gap-1.5">
-                                                                <span className="text-[10px] font-mono text-zinc-500">
-                                                                    {new Date(
-                                                                        pos.recorded_at
-                                                                    ).toLocaleTimeString('en-GB', {
-                                                                        hour: '2-digit',
-                                                                        minute: '2-digit',
-                                                                        day: '2-digit',
-                                                                        month: 'short',
-                                                                        timeZone: 'Europe/London',
-                                                                    })}
-                                                                </span>
-                                                                {pos.mergedCount > 1 && (
-                                                                    <span className="text-[8px] bg-zinc-800 text-zinc-400 px-1 py-0.5 font-bold uppercase tracking-tighter">
-                                                                        {pos.mergedCount} pts merged
-                                                                    </span>
-                                                                )}
-                                                                {pos.isLatest && (
-                                                                    <span className="text-[8px] bg-emerald-500/10 text-emerald-500 px-1 py-0.5 font-black uppercase tracking-widest border border-emerald-500/20">
-                                                                        Latest
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <span className="text-[9px] text-zinc-600 uppercase font-bold tracking-tight">
-                                                                {Number(pos.lat).toFixed(4)},{' '}
-                                                                {Number(pos.lng).toFixed(4)}
-                                                            </span>
-                                                        </div>
-                                                        <div className="text-right flex flex-col">
-                                                            <span className="text-[11px] font-black text-zinc-200">
-                                                                {Number(pos.speed).toFixed(1)} kn
-                                                            </span>
-                                                            <span className="text-[9px] text-zinc-600 uppercase font-bold tracking-tight">
-                                                                {Number(pos.course).toFixed(0)}°
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                )
-                                            )}
-
-                                        {mergedHistory.length > waypointsLimit && (
+                                    <>
+                                        <div className="flex items-center justify-between border-t border-white/5 pt-4">
+                                            <div className="flex flex-col">
+                                                <span className="text-[11px] font-bold text-zinc-300">
+                                                    Show Point Markers
+                                                </span>
+                                                <span className="text-[9px] text-zinc-500 uppercase font-bold tracking-tight">
+                                                    Individual position dots
+                                                </span>
+                                            </div>
                                             <button
-                                                type="button"
                                                 onClick={() =>
-                                                    setWaypointsLimit((prev) => prev + 10)
+                                                    onShowWaypointsChange?.(!showWaypoints)
                                                 }
-                                                className="w-full py-2 bg-white/2 hover:bg-white/5 text-[9px] text-zinc-400 hover:text-white font-bold uppercase tracking-widest transition-colors border border-white/5 mt-1"
+                                                className={`relative inline-flex h-4 w-7 items-center transition-colors focus:outline-none ${
+                                                    showWaypoints ? 'bg-zinc-400' : 'bg-zinc-800'
+                                                }`}
                                             >
-                                                Show more waypoints
+                                                <span
+                                                    className={`inline-block h-2 w-2 transform transition-transform ${
+                                                        showWaypoints
+                                                            ? 'translate-x-4 bg-white'
+                                                            : 'translate-x-1 bg-zinc-600'
+                                                    }`}
+                                                />
                                             </button>
-                                        )}
-                                    </div>
+                                        </div>
 
-                                    <div className="mt-2 p-2 bg-white/5 border border-white/5 flex items-center justify-between">
-                                        <div className="flex items-center gap-2 text-[9px] text-zinc-500 uppercase font-bold tracking-tight">
-                                            <FaClock className="w-2.5 h-2.5" />
-                                            Server Time (London)
-                                            <span className="text-zinc-400">
-                                                (
-                                                {new Date().toLocaleTimeString('en-GB', {
-                                                    hour: '2-digit',
-                                                    minute: '2-digit',
-                                                    timeZone: 'Europe/London',
-                                                })}
-                                                )
-                                            </span>
+                                        <div className="space-y-2 pt-4 border-t border-white/5">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-tight">
+                                                    History Window
+                                                </span>
+                                                <span className="text-[10px] text-zinc-200 font-mono">
+                                                    {historyHours} Hours
+                                                </span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min="1"
+                                                max="168"
+                                                step="1"
+                                                value={historyHours}
+                                                onChange={(e) =>
+                                                    setHistoryHours(parseInt(e.target.value))
+                                                }
+                                                className="w-full h-1 bg-zinc-800 appearance-none cursor-pointer accent-white"
+                                            />
+                                            <div className="flex justify-between text-[8px] text-zinc-600 font-black uppercase tracking-widest">
+                                                <span>1h</span>
+                                                <span>24h</span>
+                                                <span>7d</span>
+                                            </div>
                                         </div>
-                                        <div className="text-[9px] text-zinc-600 font-mono">
-                                            Total: {mergedHistory.length} records
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
+
+                                        {history.length > 0 && (
+                                            <div className="mt-4 pt-4 border-t border-white/5 space-y-1.5">
+                                                <div className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-1">
+                                                    Recent Waypoints
+                                                </div>
+                                                <div className="max-h-[300px] overflow-y-auto custom-scrollbar space-y-1">
+                                                    {mergedHistory.slice(0, waypointsLimit).map(
+                                                        (
+                                                            pos: HistoryPosition & {
+                                                                mergedCount: number;
+                                                            },
+                                                            i: number
+                                                        ) => (
+                                                            <div
+                                                                key={i}
+                                                                onClick={() => {
+                                                                    onNavigate?.(
+                                                                        Number(pos.lat),
+                                                                        Number(pos.lng),
+                                                                        14
+                                                                    );
+                                                                    onWaypointSelect?.(pos);
+                                                                }}
+                                                                className={`p-2 flex items-center justify-between group hover:bg-white/10 transition-all cursor-pointer border ${
+                                                                    selectedWaypointKey ===
+                                                                    pos.recorded_at
+                                                                        ? 'bg-white/10 border-white/20 shadow-lg'
+                                                                        : 'bg-white/5 border-white/5'
+                                                                }`}
+                                                            >
+                                                                <div className="flex flex-col gap-1">
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400">
+                                                                            {pos.mergedCount > 1
+                                                                                ? 'Stationary Block'
+                                                                                : 'Waypoint Detail'}
+                                                                        </span>
+                                                                        {pos.isLatest && (
+                                                                            <span className="text-[8px] bg-emerald-500/10 text-emerald-500 px-1 py-0.5 font-black uppercase tracking-widest border border-emerald-500/20">
+                                                                                Latest
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="text-[10px] font-mono text-zinc-500">
+                                                                            {new Date(
+                                                                                pos.recorded_at
+                                                                            ).toLocaleTimeString(
+                                                                                'en-GB',
+                                                                                {
+                                                                                    hour: '2-digit',
+                                                                                    minute: '2-digit',
+                                                                                    day: '2-digit',
+                                                                                    month: 'short',
+                                                                                    timeZone:
+                                                                                        'Europe/London',
+                                                                                }
+                                                                            )}
+                                                                        </span>
+                                                                        {pos.mergedCount > 1 && (
+                                                                            <span className="text-[8px] bg-zinc-800 text-zinc-500 px-1 py-0.5 font-bold uppercase tracking-tighter">
+                                                                                {pos.mergedCount}{' '}
+                                                                                Records
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <span className="text-[9px] text-zinc-600 uppercase font-bold tracking-tight">
+                                                                        {Number(pos.lat).toFixed(4)}
+                                                                        ,{' '}
+                                                                        {Number(pos.lng).toFixed(4)}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="text-right flex flex-col items-end gap-1">
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="text-[11px] font-black text-zinc-200">
+                                                                            {Number(
+                                                                                pos.speed
+                                                                            ).toFixed(1)}{' '}
+                                                                            kn
+                                                                        </span>
+                                                                        <FaLocationArrow
+                                                                            className="w-2 h-2 text-zinc-600"
+                                                                            style={{
+                                                                                transform: `rotate(${Number(pos.course) - 45}deg)`,
+                                                                            }}
+                                                                        />
+                                                                    </div>
+                                                                    <span className="text-[9px] text-zinc-600 uppercase font-bold tracking-tight">
+                                                                        {Number(pos.course).toFixed(
+                                                                            0
+                                                                        )}
+                                                                        \u00b0
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        )
+                                                    )}
+
+                                                    {mergedHistory.length > waypointsLimit && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                setWaypointsLimit(
+                                                                    (prev) => prev + 10
+                                                                )
+                                                            }
+                                                            className="w-full py-2 bg-white/2 hover:bg-white/5 text-[9px] text-zinc-400 hover:text-white font-bold uppercase tracking-widest transition-colors border border-white/5 mt-1"
+                                                        >
+                                                            Show more waypoints
+                                                        </button>
+                                                    )}
+                                                </div>
+
+                                                <div className="mt-2 p-2 bg-white/5 border border-white/5 flex items-center justify-between">
+                                                    <div className="flex items-center gap-2 text-[9px] text-zinc-500 uppercase font-bold tracking-tight">
+                                                        <FaClock className="w-2.5 h-2.5" />
+                                                        Server Time (London)
+                                                        <span className="text-zinc-400">
+                                                            (
+                                                            {new Date().toLocaleTimeString(
+                                                                'en-GB',
+                                                                {
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit',
+                                                                    timeZone: 'Europe/London',
+                                                                }
+                                                            )}
+                                                            )
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-[9px] text-zinc-600 font-mono">
+                                                        Total: {mergedHistory.length} records
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
                         </div>
                     </section>
 
@@ -932,6 +1115,9 @@ export default function ShipDetailsSidebar({
                                         .trim()}
                                 />
                             )}
+                            {!!details?.nav_status_text && (
+                                <InfoRow label="Full Status" value={details.nav_status_text} />
+                            )}
                             {!!details?.call_sign && (
                                 <InfoRow label="Call Sign" value={details.call_sign} />
                             )}
@@ -1005,12 +1191,56 @@ export default function ShipDetailsSidebar({
                                                     const mins = Math.floor(absSec / 60);
                                                     return `${mins} minute${mins !== 1 ? 's' : ''} ago`;
                                                 }
-                                                const hours = Math.floor(absSec / 3600);
-                                                return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+                                                if (absSec < 86400) {
+                                                    const hours = Math.floor(absSec / 3600);
+                                                    return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+                                                }
+                                                if (absSec < 604800) {
+                                                    const days = Math.floor(absSec / 86400);
+                                                    return `${days} day${days !== 1 ? 's' : ''} ago`;
+                                                }
+                                                if (absSec < 2592000) {
+                                                    const weeks = Math.floor(absSec / 604800);
+                                                    return `${weeks} week${weeks !== 1 ? 's' : ''} ago`;
+                                                }
+                                                const months = Math.floor(absSec / 2592000);
+                                                return `${months} month${months !== 1 ? 's' : ''} ago`;
                                             })()
                                           : 'N/A'}
                                 </span>
                             </div>
+                        </div>
+                    </section>
+
+                    <section>
+                        <SectionTitle icon={<FaArrowRight />} title="External Discovery" />
+                        <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            {generatedLinks.length > 0 ? (
+                                generatedLinks.map((link, idx) => (
+                                    <a
+                                        key={idx}
+                                        href={link.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex flex-col items-center justify-center p-3 bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 transition-all group gap-2"
+                                    >
+                                        <ExternalProviderIcon
+                                            name={link.source}
+                                            className="w-8 h-8 object-contain filter grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-300"
+                                        />
+                                        <span className="text-[9px] font-black uppercase tracking-tight text-zinc-400 group-hover:text-zinc-200 text-center">
+                                            {link.source}
+                                        </span>
+                                    </a>
+                                ))
+                            ) : (
+                                <div className="col-span-full py-6 flex flex-col items-center justify-center gap-2 bg-white/5 border border-white/5">
+                                    <FaCircleInfo className="text-zinc-600 w-5 h-5" />
+                                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                                        No identifiers available for lookup
+                                    </span>
+                                </div>
+                            )}
                         </div>
                     </section>
                 </div>
@@ -1072,4 +1302,44 @@ function InfoRow({ label, value }: { label: string; value: string }) {
             <span className="text-[11px] text-zinc-200 font-mono">{value}</span>
         </div>
     );
+}
+
+function ExternalProviderIcon({ name, className = '' }: { name: string; className?: string }) {
+    const iconMap: Record<string, string> = {
+        'marinetraffic (com)': '/images/external/vesseltrackercom.png',
+        'marinetraffic (org)': '/images/external/marinetrafficorg.png',
+        vesselfinder: '/images/external/vesselfinder.png',
+        vesseltracker: '/images/external/vesseltracker.png',
+        shipspotting: '/images/external/shipspotting.png',
+        myshiptracking: '/images/external/myshiptracking.png',
+    };
+
+    const iconPath = iconMap[name.toLowerCase()];
+
+    if (iconPath) {
+        return (
+            <img
+                src={iconPath}
+                alt={`${name} logo`}
+                className={className}
+                onError={(e) => {
+                    const domain = name.toLowerCase().includes('marinetraffic')
+                        ? name.toLowerCase().includes('org')
+                            ? 'marinetraffic.org'
+                            : 'marinetraffic.com'
+                        : name.toLowerCase();
+                    (e.target as HTMLImageElement).src =
+                        `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+                }}
+            />
+        );
+    }
+
+    switch (name.toLowerCase()) {
+        case 'sanctions_network':
+        case 'fleetleaks':
+            return <FaShieldHalved className={className} />;
+        default:
+            return <FaImage className={className} />;
+    }
 }

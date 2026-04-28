@@ -19,6 +19,7 @@ export interface HistoryPosition {
     speed: number;
     course: number;
     recorded_at: string;
+    isLatest?: boolean;
 }
 
 export default function Index() {
@@ -39,6 +40,7 @@ export default function Index() {
     const [historyData, setHistoryData] = useState<HistoryPosition[]>([]);
     const [showHistory, setShowHistory] = useState(false);
     const [showWaypoints, setShowWaypoints] = useState(true);
+    const [selectedWaypointKey, setSelectedWaypointKey] = useState<string | null>(null);
     const [showClusterZoomNotice, setShowClusterZoomNotice] = useState(false);
     const clusterZoomNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -59,6 +61,7 @@ export default function Index() {
     const handleSelectVessel = useCallback((vessel: Vessel | null) => {
         setSelectedVessel(vessel);
         setHistoryData([]);
+        setSelectedWaypointKey(null);
 
         if (vessel) {
             // @ts-expect-error - GTM dataLayer
@@ -110,6 +113,7 @@ export default function Index() {
                 historyPositions={historyData}
                 showHistory={showHistory}
                 showWaypoints={showWaypoints}
+                selectedWaypointKey={selectedWaypointKey}
                 sidebarOpen={!!selectedVessel}
             />
             <ShipDetailsSidebar
@@ -121,6 +125,11 @@ export default function Index() {
                 onNavigate={handleNavigate}
                 showWaypoints={showWaypoints}
                 onShowWaypointsChange={setShowWaypoints}
+                selectedWaypointKey={selectedWaypointKey}
+                onWaypointSelect={(pos) => {
+                    setSelectedWaypointKey(null);
+                    setTimeout(() => setSelectedWaypointKey(pos.recorded_at), 0);
+                }}
             />
         </MainLayout>
     );
