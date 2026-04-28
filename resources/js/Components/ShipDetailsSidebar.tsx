@@ -14,6 +14,7 @@ import {
     FaArrowRight,
     FaCircleExclamation,
     FaChevronDown,
+    FaImage,
 } from 'react-icons/fa6';
 import { LuAnchor, LuWaves, LuThermometer } from 'react-icons/lu';
 import axios from 'axios';
@@ -113,6 +114,12 @@ interface HistoryPosition {
     isLatest?: boolean;
 }
 
+interface ExternalLink {
+    source: string;
+    url: string;
+    icon: string;
+}
+
 interface ShipDetailsSidebarProps {
     vessel: Vessel | null;
     onClose: () => void;
@@ -194,7 +201,7 @@ export default function ShipDetailsSidebar({
             // TODO: Set API links back to relative paths after development
             let detailsData: VesselDetails | null = null;
             try {
-                const res = await axios.get(`https://sist.tristanbudd.com/api/vessels/${mmsi}`, {
+                const res = await axios.get(`/api/vessels/${mmsi}`, {
                     signal,
                 });
                 detailsData = res.data;
@@ -208,10 +215,7 @@ export default function ShipDetailsSidebar({
             }
 
             try {
-                const res = await axios.get(
-                    `https://sist.tristanbudd.com/api/conditions/weather/${mmsi}`,
-                    { signal }
-                );
+                const res = await axios.get(`/api/conditions/weather/${mmsi}`, { signal });
                 setWeather(res.data);
             } catch (err) {
                 console.error('Failed to fetch weather:', err);
@@ -223,10 +227,7 @@ export default function ShipDetailsSidebar({
             }
 
             try {
-                const res = await axios.get(
-                    `https://sist.tristanbudd.com/api/conditions/tides/${mmsi}`,
-                    { signal }
-                );
+                const res = await axios.get(`/api/conditions/tides/${mmsi}`, { signal });
                 setTides(res.data);
             } catch (err) {
                 console.error('Failed to fetch tides:', err);
@@ -238,10 +239,7 @@ export default function ShipDetailsSidebar({
             }
 
             try {
-                const res = await axios.get(
-                    `https://sist.tristanbudd.com/api/vessels/${mmsi}/sanctions`,
-                    { signal }
-                );
+                const res = await axios.get(`/api/vessels/${mmsi}/sanctions`, { signal });
                 const sanctionsData = res.data;
 
                 if (sanctionsData.sanctions && sanctionsData.sanctions.length > 3) {
@@ -258,10 +256,9 @@ export default function ShipDetailsSidebar({
             }
 
             try {
-                const res = await axios.get(
-                    `https://sist.tristanbudd.com/api/vessels/${mmsi}/history?hours=${historyHours}`,
-                    { signal }
-                );
+                const res = await axios.get(`/api/vessels/${mmsi}/history?hours=${historyHours}`, {
+                    signal,
+                });
                 let data = res.data.history || [];
 
                 if (detailsData) {
@@ -305,6 +302,53 @@ export default function ShipDetailsSidebar({
         },
         [historyHours, onHistoryUpdate]
     );
+
+    const generatedLinks = useMemo<ExternalLink[]>(() => {
+        if (!vessel) return [];
+        const mmsi = vessel.mmsi;
+        const imo = details?.imo || vessel.imo;
+
+        return [
+            {
+                source: 'MarineTraffic (COM)',
+                url: imo
+                    ? `https://www.marinetraffic.com/en/ais/details/ships/imo:${imo}`
+                    : `https://www.marinetraffic.com/en/ais/details/ships/mmsi:${mmsi}`,
+                icon: 'marinetraffic',
+            },
+            {
+                source: 'VesselFinder',
+                url: imo
+                    ? `https://www.vesselfinder.com/vessels/details/${imo}`
+                    : `https://www.vesselfinder.com/vessels?name=${mmsi}`,
+                icon: 'vesselfinder',
+            },
+            {
+                source: 'VesselTracker',
+                url: imo
+                    ? `https://www.vesseltracker.com/en/Ships/${imo}.html`
+                    : `https://www.vesseltracker.com/en/vessels.html?search=${mmsi}`,
+                icon: 'vesseltracker',
+            },
+            {
+                source: 'MarineTraffic (ORG)',
+                url: `https://www.marinetraffic.org/vessels?vessel=${imo || mmsi}`,
+                icon: 'marinetraffic_org',
+            },
+            {
+                source: 'ShipSpotting',
+                url: imo
+                    ? `https://www.shipspotting.com/photos/gallery?imo=${imo}`
+                    : `https://www.shipspotting.com/photos/gallery?mmsi=${mmsi}`,
+                icon: 'shipspotting',
+            },
+            {
+                source: 'MyShipTracking',
+                url: `https://www.myshiptracking.com/vessels/mmsi-${mmsi}`,
+                icon: 'myshiptracking',
+            },
+        ];
+    }, [vessel, details]);
 
     const mergedHistory = useMemo(() => {
         if (history.length === 0) return [];
@@ -634,8 +678,12 @@ export default function ShipDetailsSidebar({
                                                 }
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="text-[9px] text-zinc-500 font-bold uppercase hover:text-zinc-300 transition-colors underline decoration-zinc-700 underline-offset-2 shrink-0"
+                                                className="flex items-center gap-1.5 text-[9px] text-zinc-500 font-bold uppercase hover:text-zinc-300 transition-colors underline decoration-zinc-700 underline-offset-2 shrink-0"
                                             >
+                                                <ExternalProviderIcon
+                                                    name={s.source}
+                                                    className="w-3 h-3"
+                                                />
                                                 {s.source.replace('_', ' ')}
                                             </a>
                                         </div>
@@ -1092,6 +1140,38 @@ export default function ShipDetailsSidebar({
                             </div>
                         </div>
                     </section>
+
+                    <section>
+                        <SectionTitle icon={<FaArrowRight />} title="External Discovery" />
+                        <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            {generatedLinks.length > 0 ? (
+                                generatedLinks.map((link, idx) => (
+                                    <a
+                                        key={idx}
+                                        href={link.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex flex-col items-center justify-center p-3 bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 transition-all group gap-2"
+                                    >
+                                        <ExternalProviderIcon
+                                            name={link.source}
+                                            className="w-8 h-8 object-contain filter grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-300"
+                                        />
+                                        <span className="text-[9px] font-black uppercase tracking-tight text-zinc-400 group-hover:text-zinc-200 text-center">
+                                            {link.source}
+                                        </span>
+                                    </a>
+                                ))
+                            ) : (
+                                <div className="col-span-full py-6 flex flex-col items-center justify-center gap-2 bg-white/5 border border-white/5">
+                                    <FaCircleInfo className="text-zinc-600 w-5 h-5" />
+                                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                                        No identifiers available for lookup
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    </section>
                 </div>
 
                 <div className="p-6 border-t border-white/10 shrink-0 bg-zinc-950">
@@ -1151,4 +1231,44 @@ function InfoRow({ label, value }: { label: string; value: string }) {
             <span className="text-[11px] text-zinc-200 font-mono">{value}</span>
         </div>
     );
+}
+
+function ExternalProviderIcon({ name, className = '' }: { name: string; className?: string }) {
+    const iconMap: Record<string, string> = {
+        'marinetraffic (com)': '/images/external/vesseltrackercom.png', // Assuming this was meant for MT Com
+        'marinetraffic (org)': '/images/external/marinetrafficorg.png',
+        vesselfinder: '/images/external/vesselfinder.png',
+        vesseltracker: '/images/external/vesseltracker.png',
+        shipspotting: '/images/external/shipspotting.png',
+        myshiptracking: '/images/external/myshiptracking.png',
+    };
+
+    const iconPath = iconMap[name.toLowerCase()];
+
+    if (iconPath) {
+        return (
+            <img
+                src={iconPath}
+                alt={`${name} logo`}
+                className={className}
+                onError={(e) => {
+                    const domain = name.toLowerCase().includes('marinetraffic')
+                        ? name.toLowerCase().includes('org')
+                            ? 'marinetraffic.org'
+                            : 'marinetraffic.com'
+                        : name.toLowerCase();
+                    (e.target as HTMLImageElement).src =
+                        `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+                }}
+            />
+        );
+    }
+
+    switch (name.toLowerCase()) {
+        case 'sanctions_network':
+        case 'fleetleaks':
+            return <FaShieldHalved className={className} />;
+        default:
+            return <FaImage className={className} />;
+    }
 }
