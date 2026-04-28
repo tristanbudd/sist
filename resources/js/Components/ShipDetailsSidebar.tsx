@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, ReactNode } from 'react';
 import {
     FaXmark,
     FaLocationDot,
@@ -134,6 +134,7 @@ export default function ShipDetailsSidebar({
     showWaypoints = true,
     onShowWaypointsChange,
 }: ShipDetailsSidebarProps) {
+    const abortControllerRef = useRef<AbortController | null>(null);
     const [details, setDetails] = useState<VesselDetails | null>(null);
     const [weather, setWeather] = useState<WeatherData | null>(null);
     const [tides, setTides] = useState<TideData | null>(null);
@@ -182,7 +183,6 @@ export default function ShipDetailsSidebar({
         }
     }
 
-    // Sync loading state when history window changes - recommended React 18 pattern
     const [lastHistoryHours, setLastHistoryHours] = useState(historyHours);
     if (historyHours !== lastHistoryHours) {
         setLastHistoryHours(historyHours);
@@ -190,46 +190,57 @@ export default function ShipDetailsSidebar({
     }
 
     const fetchAllData = useCallback(
-        async (mmsi: number) => {
+        async (mmsi: number, signal?: AbortSignal) => {
             // TODO: Set API links back to relative paths after development
             let detailsData: VesselDetails | null = null;
             try {
-                const res = await axios.get(`https://sist.tristanbudd.com/api/vessels/${mmsi}`);
+                const res = await axios.get(`https://sist.tristanbudd.com/api/vessels/${mmsi}`, {
+                    signal,
+                });
                 detailsData = res.data;
                 setDetails(detailsData);
             } catch (err) {
                 console.error('Failed to fetch vessel details:', err);
             } finally {
-                setLoading((prev) => ({ ...prev, details: false }));
+                if (!signal?.aborted) {
+                    setLoading((prev) => ({ ...prev, details: false }));
+                }
             }
 
             try {
                 const res = await axios.get(
-                    `https://sist.tristanbudd.com/api/conditions/weather/${mmsi}`
+                    `https://sist.tristanbudd.com/api/conditions/weather/${mmsi}`,
+                    { signal }
                 );
                 setWeather(res.data);
             } catch (err) {
                 console.error('Failed to fetch weather:', err);
                 setHasEnvError(true);
             } finally {
-                setLoading((prev) => ({ ...prev, weather: false }));
+                if (!signal?.aborted) {
+                    setLoading((prev) => ({ ...prev, weather: false }));
+                }
             }
 
             try {
                 const res = await axios.get(
-                    `https://sist.tristanbudd.com/api/conditions/tides/${mmsi}`
+                    `https://sist.tristanbudd.com/api/conditions/tides/${mmsi}`,
+                    { signal }
                 );
                 setTides(res.data);
             } catch (err) {
                 console.error('Failed to fetch tides:', err);
                 setHasEnvError(true);
             } finally {
-                setLoading((prev) => ({ ...prev, tides: false }));
+                if (!signal?.aborted) {
+                    setLoading((prev) => ({ ...prev, tides: false }));
+                }
             }
 
             try {
                 const res = await axios.get(
-                    `https://sist.tristanbudd.com/api/vessels/${mmsi}/sanctions`
+                    `https://sist.tristanbudd.com/api/vessels/${mmsi}/sanctions`,
+                    { signal }
                 );
                 const sanctionsData = res.data;
 
@@ -241,12 +252,15 @@ export default function ShipDetailsSidebar({
             } catch (err) {
                 console.error('Failed to fetch sanctions:', err);
             } finally {
-                setLoading((prev) => ({ ...prev, sanctions: false }));
+                if (!signal?.aborted) {
+                    setLoading((prev) => ({ ...prev, sanctions: false }));
+                }
             }
 
             try {
                 const res = await axios.get(
-                    `https://sist.tristanbudd.com/api/vessels/${mmsi}/history?hours=${historyHours}`
+                    `https://sist.tristanbudd.com/api/vessels/${mmsi}/history?hours=${historyHours}`,
+                    { signal }
                 );
                 let data = res.data.history || [];
 
@@ -284,7 +298,9 @@ export default function ShipDetailsSidebar({
             } catch (err) {
                 console.error('Failed to fetch history:', err);
             } finally {
-                setLoading((prev) => ({ ...prev, history: false }));
+                if (!signal?.aborted) {
+                    setLoading((prev) => ({ ...prev, history: false }));
+                }
             }
         },
         [historyHours, onHistoryUpdate]
@@ -317,10 +333,23 @@ export default function ShipDetailsSidebar({
 
     useEffect(() => {
         if (vessel) {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+            const controller = new AbortController();
+            abortControllerRef.current = controller;
+
             const loadData = async () => {
-                await fetchAllData(vessel.mmsi);
+                try {
+                    await fetchAllData(vessel.mmsi, controller.signal);
+                } catch (e) {
+                    if (axios.isCancel(e)) return;
+                    console.error('Data fetch aborted or failed:', e);
+                }
             };
             loadData();
+
+            return () => controller.abort();
         }
     }, [vessel, fetchAllData]);
 
