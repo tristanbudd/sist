@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef, ReactNode } from 'react';
 import { renderToString } from 'react-dom/server';
 import {
     MapContainer,
@@ -77,7 +77,6 @@ function normalizeVessels(raw: Vessel[]): Vessel[] {
     for (const vessel of raw) {
         const trimmedName = (vessel.name || '').trim().toUpperCase();
 
-        // Ignore ships with placeholder names
         if (!trimmedName || IGNORED_VESSEL_NAMES.includes(trimmedName)) {
             continue;
         }
@@ -994,6 +993,7 @@ interface MapDisplayProps {
     historyPositions?: HistoryPosition[];
     showHistory?: boolean;
     showWaypoints?: boolean;
+    selectedWaypointKey?: string | null;
     sidebarOpen?: boolean;
 }
 
@@ -1007,6 +1007,7 @@ export default function MapDisplay({
     historyPositions = [],
     showHistory = false,
     showWaypoints = true,
+    selectedWaypointKey = null,
     sidebarOpen = false,
 }: MapDisplayProps) {
     const [showVessels, setShowVessels] = useState(true);
@@ -1044,6 +1045,7 @@ export default function MapDisplay({
                     positions={historyPositions}
                     show={showHistory}
                     showWaypoints={showWaypoints}
+                    selectedWaypointKey={selectedWaypointKey}
                 />
                 <MapViewHandler center={center} zoom={zoom} />
                 <ZoomControls />
@@ -1061,14 +1063,67 @@ export default function MapDisplay({
         </div>
     );
 }
+function WaypointMarker({
+    p,
+    isSelected,
+    createWaypointIcon,
+    children,
+}: {
+    p: HistoryPosition & { mergedCount: number };
+    isSelected: boolean;
+    createWaypointIcon: (course: number) => L.DivIcon;
+    children: ReactNode;
+}) {
+    const markerRef = useRef<L.Marker | L.CircleMarker>(null);
+
+    useEffect(() => {
+        if (isSelected && markerRef.current) {
+            const timer = setTimeout(() => {
+                markerRef.current?.openPopup();
+            }, 50);
+            return () => clearTimeout(timer);
+        }
+    }, [isSelected]);
+
+    if (p.mergedCount > 1) {
+        return (
+            <CircleMarker
+                ref={markerRef as React.Ref<L.CircleMarker>}
+                center={[Number(p.lat), Number(p.lng)]}
+                radius={4}
+                pathOptions={{
+                    fillColor: '#f4f4f5',
+                    fillOpacity: 0.8,
+                    color: '#09090b',
+                    weight: 1,
+                }}
+            >
+                {children}
+            </CircleMarker>
+        );
+    }
+
+    return (
+        <Marker
+            ref={markerRef as React.Ref<L.Marker>}
+            position={[Number(p.lat), Number(p.lng)]}
+            icon={createWaypointIcon(Number(p.course) || 0)}
+        >
+            {children}
+        </Marker>
+    );
+}
+
 function TrajectoryLayer({
     positions,
     show,
     showWaypoints,
+    selectedWaypointKey,
 }: {
     positions: HistoryPosition[];
     show: boolean;
     showWaypoints: boolean;
+    selectedWaypointKey?: string | null;
 }) {
     const merged = useMemo(() => {
         if (!show || !positions || positions.length === 0) return [];
@@ -1123,24 +1178,22 @@ function TrajectoryLayer({
                 }}
             />
             {showWaypoints &&
-                merged.map((p, i) =>
-                    p.mergedCount > 1 ? (
-                        <CircleMarker
+                merged
+                    .filter((p) => !p.isLatest)
+                    .map((p, i) => (
+                        <WaypointMarker
                             key={`${p.recorded_at}-${i}`}
-                            center={[Number(p.lat), Number(p.lng)]}
-                            radius={4}
-                            pathOptions={{
-                                fillColor: '#f4f4f5',
-                                fillOpacity: 0.8,
-                                color: '#09090b',
-                                weight: 1,
-                            }}
+                            p={p}
+                            isSelected={selectedWaypointKey === p.recorded_at}
+                            createWaypointIcon={createWaypointIcon}
                         >
                             <Popup closeButton={false} minWidth={220} className="sist-popup">
                                 <div className="bg-zinc-950 border border-white/20 shadow-2xl p-4 min-w-[220px]">
                                     <div className="flex flex-col gap-1 border-b border-white/10 pb-2 mb-2">
                                         <span className="font-bold text-[10px] uppercase tracking-[0.2em] text-zinc-200">
-                                            Stationary Block
+                                            {p.mergedCount > 1
+                                                ? 'Stationary Block'
+                                                : 'Waypoint Detail'}
                                         </span>
                                         <span className="text-[10px] font-mono text-zinc-500">
                                             {new Date(p.recorded_at).toLocaleTimeString('en-GB', {
@@ -1152,10 +1205,12 @@ function TrajectoryLayer({
                                             })}
                                         </span>
                                     </div>
-                                    <div className="text-[9px] text-zinc-500 font-black uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                                        <FaLayerGroup className="w-2.5 h-2.5 text-zinc-600" />
-                                        {p.mergedCount} Records in this area
-                                    </div>
+                                    {p.mergedCount > 1 && (
+                                        <div className="text-[9px] text-zinc-500 font-black uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                                            <FaLayerGroup className="w-2.5 h-2.5 text-zinc-600" />
+                                            {p.mergedCount} Records in this area
+                                        </div>
+                                    )}
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="flex flex-col gap-0.5">
                                             <span className="text-[8px] text-zinc-600 uppercase font-black tracking-tighter">
@@ -1181,57 +1236,8 @@ function TrajectoryLayer({
                                     </div>
                                 </div>
                             </Popup>
-                        </CircleMarker>
-                    ) : (
-                        <Marker
-                            key={`${p.recorded_at}-${i}`}
-                            position={[Number(p.lat), Number(p.lng)]}
-                            icon={createWaypointIcon(Number(p.course) || 0)}
-                        >
-                            <Popup closeButton={false} minWidth={220} className="sist-popup">
-                                <div className="bg-zinc-950 border border-white/20 shadow-2xl p-4 min-w-[220px]">
-                                    <div className="flex flex-col gap-1 border-b border-white/10 pb-2 mb-2">
-                                        <span className="font-bold text-[10px] uppercase tracking-[0.2em] text-zinc-200">
-                                            Waypoint Detail
-                                        </span>
-                                        <span className="text-[10px] font-mono text-zinc-500">
-                                            {new Date(p.recorded_at).toLocaleTimeString('en-GB', {
-                                                hour: '2-digit',
-                                                minute: '2-digit',
-                                                day: '2-digit',
-                                                month: 'short',
-                                                timeZone: 'Europe/London',
-                                            })}
-                                        </span>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="flex flex-col gap-0.5">
-                                            <span className="text-[8px] text-zinc-600 uppercase font-black tracking-tighter">
-                                                Speed
-                                            </span>
-                                            <span className="text-[11px] font-black text-zinc-300">
-                                                {Number(p.speed).toFixed(1)} kn
-                                            </span>
-                                        </div>
-                                        <div className="flex flex-col gap-0.5 text-right">
-                                            <span className="text-[8px] text-zinc-600 uppercase font-black tracking-tighter">
-                                                Course
-                                            </span>
-                                            <span className="text-[11px] font-black text-zinc-300">
-                                                {Number(p.course).toFixed(0)}°
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div className="mt-3 pt-2 border-t border-white/5 flex items-center justify-between">
-                                        <span className="text-[9px] text-zinc-600 font-mono">
-                                            {Number(p.lat).toFixed(4)}, {Number(p.lng).toFixed(4)}
-                                        </span>
-                                    </div>
-                                </div>
-                            </Popup>
-                        </Marker>
-                    )
-                )}
+                        </WaypointMarker>
+                    ))}
         </>
     );
 }

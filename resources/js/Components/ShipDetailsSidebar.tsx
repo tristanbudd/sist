@@ -129,6 +129,8 @@ interface ShipDetailsSidebarProps {
     onNavigate?: (lat: number, lng: number, zoom: number) => void;
     showWaypoints?: boolean;
     onShowWaypointsChange?: (show: boolean) => void;
+    onWaypointSelect?: (pos: HistoryPosition) => void;
+    selectedWaypointKey?: string | null;
 }
 
 export default function ShipDetailsSidebar({
@@ -140,6 +142,8 @@ export default function ShipDetailsSidebar({
     onNavigate,
     showWaypoints = true,
     onShowWaypointsChange,
+    onWaypointSelect,
+    selectedWaypointKey,
 }: ShipDetailsSidebarProps) {
     const abortControllerRef = useRef<AbortController | null>(null);
     const [details, setDetails] = useState<VesselDetails | null>(null);
@@ -147,7 +151,7 @@ export default function ShipDetailsSidebar({
     const [tides, setTides] = useState<TideData | null>(null);
     const [sanctions, setSanctions] = useState<SanctionsData | null>(null);
     const [history, setHistory] = useState<HistoryPosition[]>([]);
-    const [historyHours, setHistoryHours] = useState(24);
+    const [historyHours, setHistoryHours] = useState(1);
     const [waypointsLimit, setWaypointsLimit] = useState(10);
     const [hasEnvError, setHasEnvError] = useState(false);
     const [isMinimized, setIsMinimized] = useState(false);
@@ -167,7 +171,6 @@ export default function ShipDetailsSidebar({
 
     const [lastMmsi, setLastMmsi] = useState<number | null>(null);
 
-    // Reset state when vessel changes
     const currentMmsi = vessel?.mmsi ?? null;
     if (currentMmsi !== lastMmsi) {
         setLastMmsi(currentMmsi);
@@ -724,7 +727,7 @@ export default function ShipDetailsSidebar({
                                             Trajectory Visualization
                                         </span>
                                         <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-tight">
-                                            Map Overlay breadcrumbs
+                                            Historical voyage path visualization
                                         </span>
                                     </div>
                                     <button
@@ -755,172 +758,200 @@ export default function ShipDetailsSidebar({
                                 </div>
 
                                 {showHistory && (
-                                    <div className="flex items-center justify-between border-t border-white/5 pt-4">
-                                        <div className="flex flex-col">
-                                            <span className="text-[11px] font-bold text-zinc-300">
-                                                Show Point Markers
-                                            </span>
-                                            <span className="text-[9px] text-zinc-500 uppercase font-bold tracking-tight">
-                                                Individual position dots
-                                            </span>
-                                        </div>
-                                        <button
-                                            onClick={() => onShowWaypointsChange?.(!showWaypoints)}
-                                            className={`relative inline-flex h-4 w-7 items-center transition-colors focus:outline-none ${
-                                                showWaypoints ? 'bg-zinc-400' : 'bg-zinc-800'
-                                            }`}
-                                        >
-                                            <span
-                                                className={`inline-block h-2 w-2 transform transition-transform ${
-                                                    showWaypoints
-                                                        ? 'translate-x-4 bg-white'
-                                                        : 'translate-x-1 bg-zinc-600'
-                                                }`}
-                                            />
-                                        </button>
-                                    </div>
-                                )}
-
-                                <div className="space-y-2">
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-tight">
-                                            History Window
-                                        </span>
-                                        <span className="text-[10px] text-zinc-200 font-mono">
-                                            {historyHours} Hours
-                                        </span>
-                                    </div>
-                                    <input
-                                        type="range"
-                                        min="6"
-                                        max="168"
-                                        step="6"
-                                        value={historyHours}
-                                        onChange={(e) => setHistoryHours(parseInt(e.target.value))}
-                                        className="w-full h-1 bg-zinc-800 appearance-none cursor-pointer accent-white"
-                                    />
-                                    <div className="flex justify-between text-[8px] text-zinc-600 font-black uppercase tracking-widest">
-                                        <span>6h</span>
-                                        <span>24h</span>
-                                        <span>7d</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {history.length > 0 && (
-                                <div className="space-y-1.5">
-                                    <div className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-1">
-                                        Recent Waypoints
-                                    </div>
-                                    <div className="max-h-[300px] overflow-y-auto custom-scrollbar space-y-1 pr-1">
-                                        {mergedHistory
-                                            .slice(0, waypointsLimit)
-                                            .map(
-                                                (
-                                                    pos: HistoryPosition & { mergedCount: number },
-                                                    i: number
-                                                ) => (
-                                                    <div
-                                                        key={i}
-                                                        onClick={() =>
-                                                            onNavigate?.(
-                                                                Number(pos.lat),
-                                                                Number(pos.lng),
-                                                                14
-                                                            )
-                                                        }
-                                                        className="bg-white/5 border border-white/5 p-2 flex items-center justify-between group hover:bg-white/10 transition-colors cursor-pointer"
-                                                    >
-                                                        <div className="flex flex-col gap-1">
-                                                            <div className="flex items-center gap-1.5">
-                                                                <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400">
-                                                                    {pos.mergedCount > 1
-                                                                        ? 'Stationary Block'
-                                                                        : 'Waypoint Detail'}
-                                                                </span>
-                                                                {pos.isLatest && (
-                                                                    <span className="text-[8px] bg-emerald-500/10 text-emerald-500 px-1 py-0.5 font-black uppercase tracking-widest border border-emerald-500/20">
-                                                                        Latest
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="text-[10px] font-mono text-zinc-500">
-                                                                    {new Date(
-                                                                        pos.recorded_at
-                                                                    ).toLocaleTimeString('en-GB', {
-                                                                        hour: '2-digit',
-                                                                        minute: '2-digit',
-                                                                        day: '2-digit',
-                                                                        month: 'short',
-                                                                        timeZone: 'Europe/London',
-                                                                    })}
-                                                                </span>
-                                                                {pos.mergedCount > 1 && (
-                                                                    <span className="text-[8px] bg-zinc-800 text-zinc-500 px-1 py-0.5 font-bold uppercase tracking-tighter">
-                                                                        {pos.mergedCount} Records
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <span className="text-[9px] text-zinc-600 uppercase font-bold tracking-tight">
-                                                                {Number(pos.lat).toFixed(4)},{' '}
-                                                                {Number(pos.lng).toFixed(4)}
-                                                            </span>
-                                                        </div>
-                                                        <div className="text-right flex flex-col items-end gap-1">
-                                                            <div className="flex items-center gap-1.5">
-                                                                <span className="text-[11px] font-black text-zinc-200">
-                                                                    {Number(pos.speed).toFixed(1)}{' '}
-                                                                    kn
-                                                                </span>
-                                                                <FaLocationArrow
-                                                                    className="w-2 h-2 text-zinc-600"
-                                                                    style={{
-                                                                        transform: `rotate(${Number(pos.course) - 45}deg)`,
-                                                                    }}
-                                                                />
-                                                            </div>
-                                                            <span className="text-[9px] text-zinc-600 uppercase font-bold tracking-tight">
-                                                                {Number(pos.course).toFixed(0)}°
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                )
-                                            )}
-
-                                        {mergedHistory.length > waypointsLimit && (
+                                    <>
+                                        <div className="flex items-center justify-between border-t border-white/5 pt-4">
+                                            <div className="flex flex-col">
+                                                <span className="text-[11px] font-bold text-zinc-300">
+                                                    Show Point Markers
+                                                </span>
+                                                <span className="text-[9px] text-zinc-500 uppercase font-bold tracking-tight">
+                                                    Individual position dots
+                                                </span>
+                                            </div>
                                             <button
-                                                type="button"
                                                 onClick={() =>
-                                                    setWaypointsLimit((prev) => prev + 10)
+                                                    onShowWaypointsChange?.(!showWaypoints)
                                                 }
-                                                className="w-full py-2 bg-white/2 hover:bg-white/5 text-[9px] text-zinc-400 hover:text-white font-bold uppercase tracking-widest transition-colors border border-white/5 mt-1"
+                                                className={`relative inline-flex h-4 w-7 items-center transition-colors focus:outline-none ${
+                                                    showWaypoints ? 'bg-zinc-400' : 'bg-zinc-800'
+                                                }`}
                                             >
-                                                Show more waypoints
+                                                <span
+                                                    className={`inline-block h-2 w-2 transform transition-transform ${
+                                                        showWaypoints
+                                                            ? 'translate-x-4 bg-white'
+                                                            : 'translate-x-1 bg-zinc-600'
+                                                    }`}
+                                                />
                                             </button>
-                                        )}
-                                    </div>
+                                        </div>
 
-                                    <div className="mt-2 p-2 bg-white/5 border border-white/5 flex items-center justify-between">
-                                        <div className="flex items-center gap-2 text-[9px] text-zinc-500 uppercase font-bold tracking-tight">
-                                            <FaClock className="w-2.5 h-2.5" />
-                                            Server Time (London)
-                                            <span className="text-zinc-400">
-                                                (
-                                                {new Date().toLocaleTimeString('en-GB', {
-                                                    hour: '2-digit',
-                                                    minute: '2-digit',
-                                                    timeZone: 'Europe/London',
-                                                })}
-                                                )
-                                            </span>
+                                        <div className="space-y-2 pt-4 border-t border-white/5">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-tight">
+                                                    History Window
+                                                </span>
+                                                <span className="text-[10px] text-zinc-200 font-mono">
+                                                    {historyHours} Hours
+                                                </span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min="1"
+                                                max="168"
+                                                step="1"
+                                                value={historyHours}
+                                                onChange={(e) =>
+                                                    setHistoryHours(parseInt(e.target.value))
+                                                }
+                                                className="w-full h-1 bg-zinc-800 appearance-none cursor-pointer accent-white"
+                                            />
+                                            <div className="flex justify-between text-[8px] text-zinc-600 font-black uppercase tracking-widest">
+                                                <span>1h</span>
+                                                <span>24h</span>
+                                                <span>7d</span>
+                                            </div>
                                         </div>
-                                        <div className="text-[9px] text-zinc-600 font-mono">
-                                            Total: {mergedHistory.length} records
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
+
+                                        {history.length > 0 && (
+                                            <div className="mt-4 pt-4 border-t border-white/5 space-y-1.5">
+                                                <div className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-1">
+                                                    Recent Waypoints
+                                                </div>
+                                                <div className="max-h-[300px] overflow-y-auto custom-scrollbar space-y-1">
+                                                    {mergedHistory.slice(0, waypointsLimit).map(
+                                                        (
+                                                            pos: HistoryPosition & {
+                                                                mergedCount: number;
+                                                            },
+                                                            i: number
+                                                        ) => (
+                                                            <div
+                                                                key={i}
+                                                                onClick={() => {
+                                                                    onNavigate?.(
+                                                                        Number(pos.lat),
+                                                                        Number(pos.lng),
+                                                                        14
+                                                                    );
+                                                                    onWaypointSelect?.(pos);
+                                                                }}
+                                                                className={`p-2 flex items-center justify-between group hover:bg-white/10 transition-all cursor-pointer border ${
+                                                                    selectedWaypointKey ===
+                                                                    pos.recorded_at
+                                                                        ? 'bg-white/10 border-white/20 shadow-lg'
+                                                                        : 'bg-white/5 border-white/5'
+                                                                }`}
+                                                            >
+                                                                <div className="flex flex-col gap-1">
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400">
+                                                                            {pos.mergedCount > 1
+                                                                                ? 'Stationary Block'
+                                                                                : 'Waypoint Detail'}
+                                                                        </span>
+                                                                        {pos.isLatest && (
+                                                                            <span className="text-[8px] bg-emerald-500/10 text-emerald-500 px-1 py-0.5 font-black uppercase tracking-widest border border-emerald-500/20">
+                                                                                Latest
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="text-[10px] font-mono text-zinc-500">
+                                                                            {new Date(
+                                                                                pos.recorded_at
+                                                                            ).toLocaleTimeString(
+                                                                                'en-GB',
+                                                                                {
+                                                                                    hour: '2-digit',
+                                                                                    minute: '2-digit',
+                                                                                    day: '2-digit',
+                                                                                    month: 'short',
+                                                                                    timeZone:
+                                                                                        'Europe/London',
+                                                                                }
+                                                                            )}
+                                                                        </span>
+                                                                        {pos.mergedCount > 1 && (
+                                                                            <span className="text-[8px] bg-zinc-800 text-zinc-500 px-1 py-0.5 font-bold uppercase tracking-tighter">
+                                                                                {pos.mergedCount}{' '}
+                                                                                Records
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <span className="text-[9px] text-zinc-600 uppercase font-bold tracking-tight">
+                                                                        {Number(pos.lat).toFixed(4)}
+                                                                        ,{' '}
+                                                                        {Number(pos.lng).toFixed(4)}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="text-right flex flex-col items-end gap-1">
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="text-[11px] font-black text-zinc-200">
+                                                                            {Number(
+                                                                                pos.speed
+                                                                            ).toFixed(1)}{' '}
+                                                                            kn
+                                                                        </span>
+                                                                        <FaLocationArrow
+                                                                            className="w-2 h-2 text-zinc-600"
+                                                                            style={{
+                                                                                transform: `rotate(${Number(pos.course) - 45}deg)`,
+                                                                            }}
+                                                                        />
+                                                                    </div>
+                                                                    <span className="text-[9px] text-zinc-600 uppercase font-bold tracking-tight">
+                                                                        {Number(pos.course).toFixed(
+                                                                            0
+                                                                        )}
+                                                                        \u00b0
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        )
+                                                    )}
+
+                                                    {mergedHistory.length > waypointsLimit && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                setWaypointsLimit(
+                                                                    (prev) => prev + 10
+                                                                )
+                                                            }
+                                                            className="w-full py-2 bg-white/2 hover:bg-white/5 text-[9px] text-zinc-400 hover:text-white font-bold uppercase tracking-widest transition-colors border border-white/5 mt-1"
+                                                        >
+                                                            Show more waypoints
+                                                        </button>
+                                                    )}
+                                                </div>
+
+                                                <div className="mt-2 p-2 bg-white/5 border border-white/5 flex items-center justify-between">
+                                                    <div className="flex items-center gap-2 text-[9px] text-zinc-500 uppercase font-bold tracking-tight">
+                                                        <FaClock className="w-2.5 h-2.5" />
+                                                        Server Time (London)
+                                                        <span className="text-zinc-400">
+                                                            (
+                                                            {new Date().toLocaleTimeString(
+                                                                'en-GB',
+                                                                {
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit',
+                                                                    timeZone: 'Europe/London',
+                                                                }
+                                                            )}
+                                                            )
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-[9px] text-zinc-600 font-mono">
+                                                        Total: {mergedHistory.length} records
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
                         </div>
                     </section>
 
@@ -1275,7 +1306,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 function ExternalProviderIcon({ name, className = '' }: { name: string; className?: string }) {
     const iconMap: Record<string, string> = {
-        'marinetraffic (com)': '/images/external/vesseltrackercom.png', // Assuming this was meant for MT Com
+        'marinetraffic (com)': '/images/external/vesseltrackercom.png',
         'marinetraffic (org)': '/images/external/marinetrafficorg.png',
         vesselfinder: '/images/external/vesselfinder.png',
         vesseltracker: '/images/external/vesseltracker.png',
