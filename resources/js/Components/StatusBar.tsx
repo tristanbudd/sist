@@ -39,7 +39,7 @@ export default function StatusBar({
         const fetchStatus = async () => {
             try {
                 // TODO: Change back to relative link after dev
-                const response = await fetch('https://sist.tristanbudd.com/api/status/ready');
+                const response = await fetch('https://sist.tristanbudd.com/api/v1/status/ready');
                 const data = await response.json();
                 setSystemStatus(data);
             } catch (error) {

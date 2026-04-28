@@ -204,7 +204,7 @@ export default function ShipDetailsSidebar({
             // TODO: Set API links back to relative paths after development
             let detailsData: VesselDetails | null = null;
             try {
-                const res = await axios.get(`https://sist.tristanbudd.com/api/vessels/${mmsi}`, {
+                const res = await axios.get(`https://sist.tristanbudd.com/api/v1/vessels/${mmsi}`, {
                     signal,
                 });
                 detailsData = res.data;
@@ -219,7 +219,7 @@ export default function ShipDetailsSidebar({
 
             try {
                 const res = await axios.get(
-                    `https://sist.tristanbudd.com/api/conditions/weather/${mmsi}`,
+                    `https://sist.tristanbudd.com/api/v1/conditions/weather/${mmsi}`,
                     { signal }
                 );
                 setWeather(res.data);
@@ -234,7 +234,7 @@ export default function ShipDetailsSidebar({
 
             try {
                 const res = await axios.get(
-                    `https://sist.tristanbudd.com/api/conditions/tides/${mmsi}`,
+                    `https://sist.tristanbudd.com/api/v1/conditions/tides/${mmsi}`,
                     { signal }
                 );
                 setTides(res.data);
@@ -249,7 +249,7 @@ export default function ShipDetailsSidebar({
 
             try {
                 const res = await axios.get(
-                    `https://sist.tristanbudd.com/api/vessels/${mmsi}/sanctions`,
+                    `https://sist.tristanbudd.com/api/v1/vessels/${mmsi}/sanctions`,
                     { signal }
                 );
                 const sanctionsData = res.data;
@@ -269,7 +269,7 @@ export default function ShipDetailsSidebar({
 
             try {
                 const res = await axios.get(
-                    `https://sist.tristanbudd.com/api/vessels/${mmsi}/history?hours=${historyHours}`,
+                    `https://sist.tristanbudd.com/api/v1/vessels/${mmsi}/history?hours=${historyHours}`,
                     {
                         signal,
                     }

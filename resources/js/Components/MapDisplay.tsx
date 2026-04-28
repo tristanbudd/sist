@@ -159,7 +159,7 @@ function FleetLayer({
 
             try {
                 // TODO: Change to relative path once finished with dev
-                const response = await axios.get('https://sist.tristanbudd.com/api/vessels', {
+                const response = await axios.get('https://sist.tristanbudd.com/api/v1/vessels', {
                     signal: controller.signal,
                     params: {
                         sw_lat: bounds.getSouthWest().lat,
@@ -200,7 +200,7 @@ function FleetLayer({
         try {
             while (hasMore) {
                 // TODO: Change to relative path once finished with dev
-                const response = await axios.get('https://sist.tristanbudd.com/api/vessels', {
+                const response = await axios.get('https://sist.tristanbudd.com/api/v1/vessels', {
                     params: {
                         age_minutes: 60,
                         offset: offset,
