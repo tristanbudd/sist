@@ -157,19 +157,21 @@ export default function ShipDetailsSidebar({
         history: false,
     });
 
-    useEffect(() => {
-        setIsMinimized(false);
-    }, [vessel?.mmsi]);
+    const [lastMmsi, setLastMmsi] = useState<number | null>(null);
 
-    const fetchAllData = useCallback(
-        async (mmsi: number) => {
-            setDetails(null);
-            setWeather(null);
-            setTides(null);
-            setSanctions(null);
-            setWaypointsLimit(10);
-            setHasEnvError(false);
-            setHistory([]);
+    // Reset state when vessel changes
+    const currentMmsi = vessel?.mmsi ?? null;
+    if (currentMmsi !== lastMmsi) {
+        setLastMmsi(currentMmsi);
+        setDetails(null);
+        setWeather(null);
+        setTides(null);
+        setSanctions(null);
+        setHistory([]);
+        setWaypointsLimit(10);
+        setHasEnvError(false);
+        setIsMinimized(false);
+        if (vessel) {
             setLoading({
                 details: true,
                 weather: true,
@@ -177,7 +179,18 @@ export default function ShipDetailsSidebar({
                 sanctions: true,
                 history: true,
             });
+        }
+    }
 
+    // Sync loading state when history window changes - recommended React 18 pattern
+    const [lastHistoryHours, setLastHistoryHours] = useState(historyHours);
+    if (historyHours !== lastHistoryHours) {
+        setLastHistoryHours(historyHours);
+        setLoading((prev) => ({ ...prev, history: true }));
+    }
+
+    const fetchAllData = useCallback(
+        async (mmsi: number) => {
             // TODO: Set API links back to relative paths after development
             let detailsData: VesselDetails | null = null;
             try {
@@ -232,7 +245,6 @@ export default function ShipDetailsSidebar({
             }
 
             try {
-                setLoading((prev) => ({ ...prev, history: true }));
                 const res = await axios.get(
                     `https://sist.tristanbudd.com/api/vessels/${mmsi}/history?hours=${historyHours}`
                 );
@@ -305,12 +317,10 @@ export default function ShipDetailsSidebar({
 
     useEffect(() => {
         if (vessel) {
-            fetchAllData(vessel.mmsi);
-        } else {
-            setDetails(null);
-            setWeather(null);
-            setTides(null);
-            setSanctions(null);
+            const loadData = async () => {
+                await fetchAllData(vessel.mmsi);
+            };
+            loadData();
         }
     }, [vessel, fetchAllData]);
 

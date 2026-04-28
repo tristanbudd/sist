@@ -133,14 +133,14 @@ function FleetLayer({
     const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const trackedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
-    const [lastActivity, setLastActivity] = useState(Date.now());
+    const [lastActivity, setLastActivity] = useState(() => Date.now());
     const [isIdle, setIsIdle] = useState(false);
     const suppressNextMapClickRef = useRef(false);
     const lastClusterInteractionRef = useRef<{ mmsi: number; at: number } | null>(null);
     const IDLE_THRESHOLD = 120000;
 
     const recordActivity = useCallback(() => {
-        setLastActivity(Date.now());
+        setLastActivity(() => Date.now());
         if (isIdle) setIsIdle(false);
     }, [isIdle]);
 
@@ -157,7 +157,6 @@ function FleetLayer({
 
             const bounds = map.getBounds();
             const currentZoom = map.getZoom();
-            setZoom(currentZoom);
 
             try {
                 // TODO: Change to relative path once finished with dev
@@ -171,6 +170,7 @@ function FleetLayer({
                         age_minutes: 60,
                     },
                 });
+                setZoom(currentZoom);
                 const data = normalizeVessels(response.data.data || []);
                 setWindowVessels(data);
             } catch (error) {
@@ -289,8 +289,12 @@ function FleetLayer({
     }, [lastActivity]);
 
     useEffect(() => {
-        fetchWindowVessels(true);
-        fetchTrackedSearchVessels();
+        const initializeMapData = async () => {
+            await fetchWindowVessels(true);
+            await fetchTrackedSearchVessels();
+        };
+
+        initializeMapData();
 
         pollTimer.current = setInterval(() => fetchWindowVessels(), 15000);
         trackedTimer.current = setInterval(() => fetchTrackedSearchVessels(), 300000);
@@ -482,21 +486,24 @@ function FleetLayer({
         });
     };
 
-    const handleClusterInteraction = (vessel: ClusteredVessel) => {
-        const now = Date.now();
-        const last = lastClusterInteractionRef.current;
-        if (last && last.mmsi === vessel.mmsi && now - last.at < 250) return;
-        lastClusterInteractionRef.current = { mmsi: vessel.mmsi, at: now };
+    const handleClusterInteraction = useCallback(
+        (vessel: ClusteredVessel) => {
+            const now = Date.now();
+            const last = lastClusterInteractionRef.current;
+            if (last && last.mmsi === vessel.mmsi && now - last.at < 250) return;
+            lastClusterInteractionRef.current = { mmsi: vessel.mmsi, at: now };
 
-        suppressNextMapClickRef.current = true;
-        if (onVesselSelect) onVesselSelect(null);
-        if (onClusterZoomNotice) onClusterZoomNotice();
-        const nextZoom = Math.min(Math.max(map.getZoom() + 2, 11), 14);
-        map.flyTo([vessel.lat, vessel.lng], nextZoom, {
-            duration: 0.7,
-            easeLinearity: 0.25,
-        });
-    };
+            suppressNextMapClickRef.current = true;
+            if (onVesselSelect) onVesselSelect(null);
+            if (onClusterZoomNotice) onClusterZoomNotice();
+            const nextZoom = Math.min(Math.max(map.getZoom() + 2, 11), 14);
+            map.flyTo([vessel.lat, vessel.lng], nextZoom, {
+                duration: 0.7,
+                easeLinearity: 0.25,
+            });
+        },
+        [map, onVesselSelect, onClusterZoomNotice]
+    );
 
     const handleMarkerClick = (vessel: ClusteredVessel, e: L.LeafletMouseEvent) => {
         if (vessel.isCluster) {
