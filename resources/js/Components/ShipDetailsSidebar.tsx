@@ -427,8 +427,45 @@ export default function ShipDetailsSidebar({
                             <StatusCard
                                 label="Nav Status"
                                 value={
-                                    details?.nav_status_text ||
-                                    (loading.details ? '...' : 'Underway')
+                                    loading.details
+                                        ? '...'
+                                        : (() => {
+                                              const s = details?.navigational_status;
+                                              switch (s) {
+                                                  case 0:
+                                                      return 'Underway';
+                                                  case 1:
+                                                      return 'Anchored';
+                                                  case 2:
+                                                      return 'NUC';
+                                                  case 3:
+                                                      return 'Restricted';
+                                                  case 4:
+                                                      return 'Constrained';
+                                                  case 5:
+                                                      return 'Moored';
+                                                  case 6:
+                                                      return 'Aground';
+                                                  case 7:
+                                                      return 'Fishing';
+                                                  case 8:
+                                                      return 'Sailing';
+                                                  case 9:
+                                                      return 'HSC';
+                                                  case 10:
+                                                      return 'WIG';
+                                                  case 11:
+                                                      return 'Towing';
+                                                  case 12:
+                                                      return 'Pushing';
+                                                  case 13:
+                                                      return 'Reserved';
+                                                  case 14:
+                                                      return 'SART Active';
+                                                  default:
+                                                      return 'Not Defined';
+                                              }
+                                          })()
                                 }
                                 icon={<LuAnchor className="text-zinc-500" />}
                             />
@@ -970,6 +1007,9 @@ export default function ShipDetailsSidebar({
                                         .replace(/\s+all ships of this type/i, '')
                                         .trim()}
                                 />
+                            )}
+                            {!!details?.nav_status_text && (
+                                <InfoRow label="Full Status" value={details.nav_status_text} />
                             )}
                             {!!details?.call_sign && (
                                 <InfoRow label="Call Sign" value={details.call_sign} />
