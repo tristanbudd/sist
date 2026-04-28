@@ -1101,21 +1101,13 @@ function TrajectoryLayer({
             className: 'waypoint-icon-container',
             html: `
                 <div style="transform: rotate(${course}deg); display: flex; align-items: center; justify-content: center; opacity: 0.8;">
-                    ${renderToString(
-                        <FaLocationArrow
-                            style={{
-                                color: '#f4f4f5',
-                                width: '10px',
-                                height: '10px',
-                                transform: 'rotate(-45deg)',
-                                filter: 'drop-shadow(0 0 1px black)',
-                            }}
-                        />
-                    )}
+                    <svg viewBox="0 0 448 512" style="width: 12px; height: 12px; transform: rotate(-45deg); filter: drop-shadow(0 0 1px black);" fill="#f4f4f5">
+                        <path d="M429.6 92.1c4.9-11.9 2.1-25.6-7-34.7s-22.8-11.9-34.7-7l-352 144c-14.2 5.8-22.2 20.8-19.3 35.8s16.1 25.8 31.4 25.8H224V432c0 15.3 10.8 28.4 25.8 31.4s30-5.1 35.8-19.3l144-352z"/>
+                    </svg>
                 </div>
             `,
-            iconSize: [14, 14],
-            iconAnchor: [7, 7],
+            iconSize: [16, 16],
+            iconAnchor: [8, 8],
         });
     };
 
@@ -1131,64 +1123,115 @@ function TrajectoryLayer({
                 }}
             />
             {showWaypoints &&
-                merged.map((p, i) => (
-                    <Marker
-                        key={`${p.recorded_at}-${i}`}
-                        position={[Number(p.lat), Number(p.lng)]}
-                        icon={createWaypointIcon(Number(p.course) || 0)}
-                    >
-                        <Popup closeButton={false} minWidth={220} className="sist-popup">
-                            <div className="bg-zinc-950 border border-white/20 shadow-2xl p-4 min-w-[220px]">
-                                <div className="flex flex-col gap-1 border-b border-white/10 pb-2 mb-2">
-                                    <span className="font-bold text-[10px] uppercase tracking-[0.2em] text-zinc-200">
-                                        {p.mergedCount > 1 ? 'Stationary Block' : 'Waypoint Detail'}
-                                    </span>
-                                    <span className="text-[10px] font-mono text-zinc-500">
-                                        {new Date(p.recorded_at).toLocaleTimeString('en-GB', {
-                                            hour: '2-digit',
-                                            minute: '2-digit',
-                                            day: '2-digit',
-                                            month: 'short',
-                                            timeZone: 'Europe/London',
-                                        })}
-                                    </span>
-                                </div>
-
-                                {p.mergedCount > 1 && (
+                merged.map((p, i) =>
+                    p.mergedCount > 1 ? (
+                        <CircleMarker
+                            key={`${p.recorded_at}-${i}`}
+                            center={[Number(p.lat), Number(p.lng)]}
+                            radius={4}
+                            pathOptions={{
+                                fillColor: '#f4f4f5',
+                                fillOpacity: 0.8,
+                                color: '#09090b',
+                                weight: 1,
+                            }}
+                        >
+                            <Popup closeButton={false} minWidth={220} className="sist-popup">
+                                <div className="bg-zinc-950 border border-white/20 shadow-2xl p-4 min-w-[220px]">
+                                    <div className="flex flex-col gap-1 border-b border-white/10 pb-2 mb-2">
+                                        <span className="font-bold text-[10px] uppercase tracking-[0.2em] text-zinc-200">
+                                            Stationary Block
+                                        </span>
+                                        <span className="text-[10px] font-mono text-zinc-500">
+                                            {new Date(p.recorded_at).toLocaleTimeString('en-GB', {
+                                                hour: '2-digit',
+                                                minute: '2-digit',
+                                                day: '2-digit',
+                                                month: 'short',
+                                                timeZone: 'Europe/London',
+                                            })}
+                                        </span>
+                                    </div>
                                     <div className="text-[9px] text-zinc-500 font-black uppercase tracking-widest mb-3 flex items-center gap-1.5">
                                         <FaLayerGroup className="w-2.5 h-2.5 text-zinc-600" />
                                         {p.mergedCount} Records in this area
                                     </div>
-                                )}
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="flex flex-col gap-0.5">
-                                        <span className="text-[8px] text-zinc-600 uppercase font-black tracking-tighter">
-                                            Speed
-                                        </span>
-                                        <span className="text-[11px] font-black text-zinc-300">
-                                            {Number(p.speed).toFixed(1)} kn
-                                        </span>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="flex flex-col gap-0.5">
+                                            <span className="text-[8px] text-zinc-600 uppercase font-black tracking-tighter">
+                                                Speed
+                                            </span>
+                                            <span className="text-[11px] font-black text-zinc-300">
+                                                {Number(p.speed).toFixed(1)} kn
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-col gap-0.5 text-right">
+                                            <span className="text-[8px] text-zinc-600 uppercase font-black tracking-tighter">
+                                                Course
+                                            </span>
+                                            <span className="text-[11px] font-black text-zinc-300">
+                                                {Number(p.course).toFixed(0)}°
+                                            </span>
+                                        </div>
                                     </div>
-                                    <div className="flex flex-col gap-0.5 text-right">
-                                        <span className="text-[8px] text-zinc-600 uppercase font-black tracking-tighter">
-                                            Course
-                                        </span>
-                                        <span className="text-[11px] font-black text-zinc-300">
-                                            {Number(p.course).toFixed(0)}°
+                                    <div className="mt-3 pt-2 border-t border-white/5 flex items-center justify-between">
+                                        <span className="text-[9px] text-zinc-600 font-mono">
+                                            {Number(p.lat).toFixed(4)}, {Number(p.lng).toFixed(4)}
                                         </span>
                                     </div>
                                 </div>
-
-                                <div className="mt-3 pt-2 border-t border-white/5 flex items-center justify-between">
-                                    <span className="text-[9px] text-zinc-600 font-mono">
-                                        {Number(p.lat).toFixed(4)}, {Number(p.lng).toFixed(4)}
-                                    </span>
+                            </Popup>
+                        </CircleMarker>
+                    ) : (
+                        <Marker
+                            key={`${p.recorded_at}-${i}`}
+                            position={[Number(p.lat), Number(p.lng)]}
+                            icon={createWaypointIcon(Number(p.course) || 0)}
+                        >
+                            <Popup closeButton={false} minWidth={220} className="sist-popup">
+                                <div className="bg-zinc-950 border border-white/20 shadow-2xl p-4 min-w-[220px]">
+                                    <div className="flex flex-col gap-1 border-b border-white/10 pb-2 mb-2">
+                                        <span className="font-bold text-[10px] uppercase tracking-[0.2em] text-zinc-200">
+                                            Waypoint Detail
+                                        </span>
+                                        <span className="text-[10px] font-mono text-zinc-500">
+                                            {new Date(p.recorded_at).toLocaleTimeString('en-GB', {
+                                                hour: '2-digit',
+                                                minute: '2-digit',
+                                                day: '2-digit',
+                                                month: 'short',
+                                                timeZone: 'Europe/London',
+                                            })}
+                                        </span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="flex flex-col gap-0.5">
+                                            <span className="text-[8px] text-zinc-600 uppercase font-black tracking-tighter">
+                                                Speed
+                                            </span>
+                                            <span className="text-[11px] font-black text-zinc-300">
+                                                {Number(p.speed).toFixed(1)} kn
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-col gap-0.5 text-right">
+                                            <span className="text-[8px] text-zinc-600 uppercase font-black tracking-tighter">
+                                                Course
+                                            </span>
+                                            <span className="text-[11px] font-black text-zinc-300">
+                                                {Number(p.course).toFixed(0)}°
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="mt-3 pt-2 border-t border-white/5 flex items-center justify-between">
+                                        <span className="text-[9px] text-zinc-600 font-mono">
+                                            {Number(p.lat).toFixed(4)}, {Number(p.lng).toFixed(4)}
+                                        </span>
+                                    </div>
                                 </div>
-                            </div>
-                        </Popup>
-                    </Marker>
-                ))}
+                            </Popup>
+                        </Marker>
+                    )
+                )}
         </>
     );
 }

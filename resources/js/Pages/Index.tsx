@@ -19,6 +19,7 @@ export interface HistoryPosition {
     speed: number;
     course: number;
     recorded_at: string;
+    isLatest?: boolean;
 }
 
 export default function Index() {

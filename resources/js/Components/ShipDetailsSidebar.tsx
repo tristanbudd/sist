@@ -201,7 +201,7 @@ export default function ShipDetailsSidebar({
             // TODO: Set API links back to relative paths after development
             let detailsData: VesselDetails | null = null;
             try {
-                const res = await axios.get(`/api/vessels/${mmsi}`, {
+                const res = await axios.get(`https://sist.tristanbudd.com/api/vessels/${mmsi}`, {
                     signal,
                 });
                 detailsData = res.data;
@@ -215,7 +215,10 @@ export default function ShipDetailsSidebar({
             }
 
             try {
-                const res = await axios.get(`/api/conditions/weather/${mmsi}`, { signal });
+                const res = await axios.get(
+                    `https://sist.tristanbudd.com/api/conditions/weather/${mmsi}`,
+                    { signal }
+                );
                 setWeather(res.data);
             } catch (err) {
                 console.error('Failed to fetch weather:', err);
@@ -227,7 +230,10 @@ export default function ShipDetailsSidebar({
             }
 
             try {
-                const res = await axios.get(`/api/conditions/tides/${mmsi}`, { signal });
+                const res = await axios.get(
+                    `https://sist.tristanbudd.com/api/conditions/tides/${mmsi}`,
+                    { signal }
+                );
                 setTides(res.data);
             } catch (err) {
                 console.error('Failed to fetch tides:', err);
@@ -239,7 +245,10 @@ export default function ShipDetailsSidebar({
             }
 
             try {
-                const res = await axios.get(`/api/vessels/${mmsi}/sanctions`, { signal });
+                const res = await axios.get(
+                    `https://sist.tristanbudd.com/api/vessels/${mmsi}/sanctions`,
+                    { signal }
+                );
                 const sanctionsData = res.data;
 
                 if (sanctionsData.sanctions && sanctionsData.sanctions.length > 3) {
@@ -256,9 +265,12 @@ export default function ShipDetailsSidebar({
             }
 
             try {
-                const res = await axios.get(`/api/vessels/${mmsi}/history?hours=${historyHours}`, {
-                    signal,
-                });
+                const res = await axios.get(
+                    `https://sist.tristanbudd.com/api/vessels/${mmsi}/history?hours=${historyHours}`,
+                    {
+                        signal,
+                    }
+                );
                 let data = res.data.history || [];
 
                 if (detailsData) {
@@ -366,7 +378,7 @@ export default function ShipDetailsSidebar({
                     Math.pow(Number(pos.lng) - Number(last.lng), 2)
             );
 
-            if (!pos.isLatest && !last.isLatest && dist < 0.0005) {
+            if (dist < 0.0005) {
                 last.mergedCount++;
             } else {
                 result.push({ ...pos, mergedCount: 1 });
@@ -819,8 +831,20 @@ export default function ShipDetailsSidebar({
                                                         }
                                                         className="bg-white/5 border border-white/5 p-2 flex items-center justify-between group hover:bg-white/10 transition-colors cursor-pointer"
                                                     >
-                                                        <div className="flex flex-col">
+                                                        <div className="flex flex-col gap-1">
                                                             <div className="flex items-center gap-1.5">
+                                                                <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400">
+                                                                    {pos.mergedCount > 1
+                                                                        ? 'Stationary Block'
+                                                                        : 'Waypoint Detail'}
+                                                                </span>
+                                                                {pos.isLatest && (
+                                                                    <span className="text-[8px] bg-emerald-500/10 text-emerald-500 px-1 py-0.5 font-black uppercase tracking-widest border border-emerald-500/20">
+                                                                        Latest
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
                                                                 <span className="text-[10px] font-mono text-zinc-500">
                                                                     {new Date(
                                                                         pos.recorded_at
@@ -833,13 +857,8 @@ export default function ShipDetailsSidebar({
                                                                     })}
                                                                 </span>
                                                                 {pos.mergedCount > 1 && (
-                                                                    <span className="text-[8px] bg-zinc-800 text-zinc-400 px-1 py-0.5 font-bold uppercase tracking-tighter">
-                                                                        {pos.mergedCount} pts merged
-                                                                    </span>
-                                                                )}
-                                                                {pos.isLatest && (
-                                                                    <span className="text-[8px] bg-emerald-500/10 text-emerald-500 px-1 py-0.5 font-black uppercase tracking-widest border border-emerald-500/20">
-                                                                        Latest
+                                                                    <span className="text-[8px] bg-zinc-800 text-zinc-500 px-1 py-0.5 font-bold uppercase tracking-tighter">
+                                                                        {pos.mergedCount} Records
                                                                     </span>
                                                                 )}
                                                             </div>
@@ -848,10 +867,19 @@ export default function ShipDetailsSidebar({
                                                                 {Number(pos.lng).toFixed(4)}
                                                             </span>
                                                         </div>
-                                                        <div className="text-right flex flex-col">
-                                                            <span className="text-[11px] font-black text-zinc-200">
-                                                                {Number(pos.speed).toFixed(1)} kn
-                                                            </span>
+                                                        <div className="text-right flex flex-col items-end gap-1">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="text-[11px] font-black text-zinc-200">
+                                                                    {Number(pos.speed).toFixed(1)}{' '}
+                                                                    kn
+                                                                </span>
+                                                                <FaLocationArrow
+                                                                    className="w-2 h-2 text-zinc-600"
+                                                                    style={{
+                                                                        transform: `rotate(${Number(pos.course) - 45}deg)`,
+                                                                    }}
+                                                                />
+                                                            </div>
                                                             <span className="text-[9px] text-zinc-600 uppercase font-bold tracking-tight">
                                                                 {Number(pos.course).toFixed(0)}°
                                                             </span>
