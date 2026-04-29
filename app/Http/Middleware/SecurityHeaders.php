@@ -41,7 +41,6 @@ class SecurityHeaders
                    "font-src 'self' https://fonts.gstatic.com; ".
                    "connect-src 'self' https://sist.tristanbudd.com wss://* https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com; ".
                    "frame-ancestors 'none'; ".
-                   "require-trusted-types-for 'script'; ".
                    'upgrade-insecure-requests';
 
             $response->headers->set('Content-Security-Policy', $csp);
