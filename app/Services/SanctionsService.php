@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Log;
  */
 class SanctionsService
 {
-    private const CACHE_VERSION = 'v2';
+    private const CACHE_VERSION = 'v4';
 
     private const CACHE_TTL = 86400; // 24 hours
 
@@ -125,19 +125,33 @@ class SanctionsService
             }
 
             $results = [];
+            $vesselNameNorm = $this->normalizeText($vesselName);
+
             foreach ($entities as $entity) {
                 if (! is_array($entity)) {
                     continue;
                 }
 
                 $names = $this->asList($entity['names'] ?? $entity['name'] ?? []);
+                $entityName = $entity['name'] ?? ($names[0] ?? null);
+
+                $isExact = $this->normalizeText($entityName) === $vesselNameNorm;
+                if (! $isExact) {
+                    foreach ($names as $altName) {
+                        if ($this->normalizeText($altName) === $vesselNameNorm) {
+                            $isExact = true;
+                            break;
+                        }
+                    }
+                }
 
                 $results[] = [
-                    'name' => $names[0] ?? ($entity['name'] ?? $vesselName),
+                    'name' => $entityName ?? $vesselName,
                     'source' => $entity['source'] ?? null,
                     'source_id' => $entity['source_id'] ?? $entity['id'] ?? null,
                     'alternate_names' => $names,
                     'matched_name' => $vesselName,
+                    'match_type' => $isExact ? 'exact' : 'fuzzy',
                 ];
             }
 
@@ -145,7 +159,7 @@ class SanctionsService
 
             $result = [
                 'status' => 'ok',
-                'found' => ! empty($results),
+                'found' => collect($results)->where('match_type', 'exact')->isNotEmpty(),
                 'count' => count($results),
                 'results' => $results,
             ];
@@ -218,40 +232,72 @@ class SanctionsService
             }
 
             $matches = [];
+            $targetImo = $this->normalizeId($imoNumber);
+            $targetMmsi = $this->normalizeId($mmsi);
+            $targetName = $this->normalizeText($vesselName);
+
             foreach ($allVessels as $vessel) {
                 if (! is_array($vessel)) {
                     continue;
                 }
 
-                $nameCandidate = (string) ($vessel['name'] ?? '');
-                $imoCandidate = $this->normalizeScalar($vessel['imo'] ?? null);
-                $mmsiCandidate = $this->normalizeScalar($vessel['mmsi'] ?? null);
-                $callCandidate = $this->normalizeScalar($vessel['call_sign'] ?? $vessel['callSign'] ?? null);
+                $imoCandidate = $this->normalizeId($vessel['imo'] ?? null);
+                $mmsiCandidate = $this->normalizeId($vessel['mmsi'] ?? null);
+                $nameCandidate = $this->normalizeText($vessel['name'] ?? '');
 
-                $nameMatch = $this->textMatches($nameCandidate, $vesselName);
-                $imoMatch = $imoNumber !== null && $imoCandidate !== '' && $imoCandidate === $this->normalizeScalar($imoNumber);
-                $mmsiMatch = $mmsi !== null && $mmsiCandidate !== '' && $mmsiCandidate === $this->normalizeScalar($mmsi);
-                $callMatch = $callSign !== null && $callCandidate !== '' && $this->textMatches($callCandidate, $callSign);
+                $isMatch = false;
 
-                if (! ($nameMatch || $imoMatch || $mmsiMatch || $callMatch)) {
+                if ($targetImo !== '' && $imoCandidate !== '') {
+                    if ($targetImo === $imoCandidate) {
+                        $isMatch = true;
+                    } else {
+                        continue;
+                    }
+                }
+
+                if (! $isMatch && $targetMmsi !== '' && $mmsiCandidate !== '') {
+                    if ($targetMmsi === $mmsiCandidate) {
+                        $isMatch = true;
+                    } else {
+                        continue;
+                    }
+                }
+
+                if (! $isMatch && $targetName !== '' && $nameCandidate !== '') {
+                    if ($targetName === $nameCandidate) {
+                        $isMatch = true;
+                    }
+                }
+
+                $isFuzzyMatch = false;
+                if (! $isMatch && $targetName !== '' && $nameCandidate !== '') {
+                    if (str_contains($targetName, $nameCandidate) || str_contains($nameCandidate, $targetName)) {
+                        $isFuzzyMatch = true;
+                    }
+                }
+
+                if (! $isMatch && ! $isFuzzyMatch) {
                     continue;
                 }
 
                 $matches[] = [
-                    'name' => $nameCandidate !== '' ? $nameCandidate : $vesselName,
+                    'name' => ($vessel['name'] ?? '') !== '' ? $vessel['name'] : $vesselName,
                     'imo' => $vessel['imo'] ?? null,
                     'mmsi' => $vessel['mmsi'] ?? null,
                     'call_sign' => $vessel['call_sign'] ?? $vessel['callSign'] ?? null,
                     'flag' => $vessel['flag'] ?? null,
                     'vessel_type' => $vessel['vessel_type'] ?? null,
-                    'sanctioned_by' => $this->asList($vessel['sanctions'] ?? []),
+                    'sanctioned_by' => $this->asList($vessel['sanctioners'] ?? $vessel['sanctions'] ?? []),
+                    'link' => $vessel['link'] ?? null,
                     'ais_status' => $vessel['ais_status'] ?? null,
+                    'match_type' => $isMatch ? 'exact' : 'fuzzy',
+                    'matched_name' => $vesselName,
                 ];
             }
 
             $result = [
                 'status' => 'ok',
-                'found' => ! empty($matches),
+                'found' => collect($matches)->where('match_type', 'exact')->isNotEmpty(),
                 'count' => count($matches),
                 'results' => array_slice($matches, 0, 25),
             ];
@@ -425,6 +471,13 @@ class SanctionsService
         return $this->normalizeText((string) $value);
     }
 
+    private function normalizeId(mixed $value): string
+    {
+        $scalar = (string) ($value ?? '');
+
+        return preg_replace('/\D/', '', $scalar) ?? '';
+    }
+
     private function textMatches(string $haystack, string $needle): bool
     {
         $needleNorm = $this->normalizeText($needle);
@@ -434,7 +487,7 @@ class SanctionsService
             return false;
         }
 
-        return str_contains($haystackNorm, $needleNorm) || str_contains($needleNorm, $haystackNorm);
+        return $needleNorm === $haystackNorm;
     }
 
     private function asList(mixed $value): array

@@ -95,11 +95,32 @@ interface SanctionRecord {
     source: string;
     source_id?: string;
     matched_name?: string;
+    sanctioned_by?: string[];
+    link?: string;
+    match_type?: 'exact' | 'fuzzy';
 }
+
+const SANCTIONER_MAPPING: Record<string, { name: string; body: string }> = {
+    us: { name: 'United States (US)', body: 'OFAC SDN / BIS List' },
+    eu: { name: 'European Union (EU)', body: 'EEAS Consolidated List' },
+    un: { name: 'United Nations (UN)', body: 'UNSC Sanctions Regimes' },
+    uk: { name: 'United Kingdom (UK)', body: 'HM Treasury (OFSI)' },
+    ca: { name: 'Canada (CA)', body: 'Special Economic Measures (SARA)' },
+    au: { name: 'Australia (AU)', body: 'DFAT Consolidated List' },
+    jp: { name: 'Japan (JP)', body: 'METI Asset Freeze List' },
+    ch: { name: 'Switzerland (CH)', body: 'SECO Sanctions' },
+    fr: { name: 'France (FR)', body: 'National Asset Freeze List' },
+    no: { name: 'Norway (NO)', body: 'MFA Sanctions List' },
+    ru: { name: 'Russia (RU)', body: 'Rosfinmonitoring Watchlist' },
+    ua: { name: 'Ukraine (UA)', body: 'NSDC Sanctions' },
+    ina: { name: 'Indonesia (INA)', body: 'National Authority (BAPETEN)' },
+    kr: { name: 'South Korea (KR)', body: 'Financial Services Commission' },
+    sg: { name: 'Singapore (SG)', body: 'MAS Sanctions List' },
+};
 
 interface SanctionsData {
     is_sanctioned: boolean;
-    risk_level: 'low' | 'medium' | 'high' | 'critical';
+    risk_level: 'clear' | 'low' | 'medium' | 'high';
     sanctions_count: number;
     sources_confirming: string[];
     sanctions: SanctionRecord[];
@@ -154,6 +175,7 @@ export default function ShipDetailsSidebar({
     const [historyHours, setHistoryHours] = useState(1);
     const [waypointsLimit, setWaypointsLimit] = useState(10);
     const [hasEnvError, setHasEnvError] = useState(false);
+    const [hasSanctionsError, setHasSanctionsError] = useState(false);
     const [isMinimized, setIsMinimized] = useState(false);
     const [loading, setLoading] = useState<{
         details: boolean;
@@ -181,6 +203,7 @@ export default function ShipDetailsSidebar({
         setHistory([]);
         setWaypointsLimit(10);
         setHasEnvError(false);
+        setHasSanctionsError(false);
         setIsMinimized(false);
         if (vessel) {
             setLoading({
@@ -201,7 +224,6 @@ export default function ShipDetailsSidebar({
 
     const fetchAllData = useCallback(
         async (mmsi: number, signal?: AbortSignal) => {
-            // TODO: Set API links back to relative paths after development
             let detailsData: VesselDetails | null = null;
             try {
                 const res = await axios.get(`https://sist.tristanbudd.com/api/v1/vessels/${mmsi}`, {
@@ -254,13 +276,20 @@ export default function ShipDetailsSidebar({
                 );
                 const sanctionsData = res.data;
 
-                if (sanctionsData.sanctions && sanctionsData.sanctions.length > 3) {
-                    sanctionsData.risk_level = 'high';
-                }
+                const officialSanctions =
+                    sanctionsData.sanctions?.filter(
+                        (s: SanctionRecord) => s.source === 'fleetleaks' && s.match_type === 'exact'
+                    ) || [];
+                const hasOfficial = officialSanctions.length > 0;
+
+                sanctionsData.risk_level = hasOfficial ? 'high' : 'clear';
+                sanctionsData.is_sanctioned = hasOfficial;
 
                 setSanctions(sanctionsData);
+                setHasSanctionsError(false);
             } catch (err) {
                 console.error('Failed to fetch sanctions:', err);
+                setHasSanctionsError(true);
             } finally {
                 if (!signal?.aborted) {
                     setLoading((prev) => ({ ...prev, sanctions: false }));
@@ -586,134 +615,211 @@ export default function ShipDetailsSidebar({
                             </div>
                         </div>
                     </section>
-
                     <section className={loading.sanctions ? 'animate-pulse opacity-50' : ''}>
                         <SectionTitle icon={<FaShieldHalved />} title="Compliance & Security" />
-                        <div
-                            className={`mt-4 p-4 border flex items-center justify-between gap-4 ${
-                                loading.sanctions
-                                    ? 'bg-zinc-900 border-zinc-800'
-                                    : sanctions?.risk_level === 'high' ||
-                                        sanctions?.risk_level === 'critical'
-                                      ? 'bg-red-500/10 border-red-500/20'
-                                      : sanctions?.risk_level === 'medium'
-                                        ? 'bg-amber-500/10 border-amber-500/20'
-                                        : sanctions
-                                          ? 'bg-emerald-500/10 border-emerald-500/20'
-                                          : 'bg-white/5 border-white/10'
-                            }`}
-                        >
-                            <div className="flex items-center gap-3 min-w-0">
-                                {loading.sanctions ? (
-                                    <div className="w-8 h-8 bg-zinc-800 animate-pulse" />
-                                ) : sanctions?.risk_level === 'high' ||
-                                  sanctions?.risk_level === 'critical' ? (
-                                    <FaCircleExclamation className="text-red-500 w-8 h-8 shrink-0" />
-                                ) : sanctions?.risk_level === 'medium' ? (
-                                    <FaCircleExclamation className="text-amber-500 w-8 h-8 shrink-0" />
-                                ) : (
-                                    <FaCircleCheck className="text-emerald-500 w-8 h-8 shrink-0" />
-                                )}
-                                <div className="min-w-0">
-                                    <div
-                                        className={`text-sm font-black uppercase tracking-tight truncate ${
-                                            loading.sanctions
-                                                ? 'text-zinc-500'
-                                                : sanctions?.risk_level === 'high' ||
-                                                    sanctions?.risk_level === 'critical'
-                                                  ? 'text-red-500'
-                                                  : sanctions?.risk_level === 'medium'
-                                                    ? 'text-amber-500'
-                                                    : 'text-emerald-500'
-                                        }`}
-                                    >
-                                        {loading.sanctions
-                                            ? 'Verifying...'
-                                            : sanctions?.is_sanctioned
-                                              ? 'Sanctioned'
-                                              : 'Clear'}
-                                    </div>
-                                    <div className="text-[10px] text-zinc-500 truncate">
-                                        {loading.sanctions
-                                            ? 'Checking databases'
-                                            : sanctions?.is_sanctioned
-                                              ? `${sanctions.sanctions_count} lists`
-                                              : 'SDN & UN verified'}
-                                    </div>
-                                </div>
-                            </div>
-                            {sanctions && !loading.sanctions && (
-                                <div
-                                    className={`px-2 py-1 text-[10px] font-black uppercase tracking-widest shrink-0 ${
-                                        sanctions.risk_level === 'high' ||
-                                        sanctions.risk_level === 'critical'
-                                            ? 'bg-red-500 text-white'
-                                            : sanctions.risk_level === 'medium'
-                                              ? 'bg-amber-500 text-black'
-                                              : 'bg-emerald-500 text-white'
-                                    }`}
-                                >
-                                    {sanctions.risk_level}
-                                </div>
-                            )}
-                        </div>
+                        {(() => {
+                            const officialSanctions =
+                                sanctions?.sanctions.filter(
+                                    (s) => s.source === 'fleetleaks' && s.match_type === 'exact'
+                                ) || [];
+                            const isOfficiallySanctioned = officialSanctions.length > 0;
+                            const networkMatches =
+                                sanctions?.sanctions.filter(
+                                    (s) => s.match_type === 'fuzzy' || s.source !== 'fleetleaks'
+                                ) || [];
 
-                        {sanctions?.is_sanctioned && sanctions.sanctions.length > 0 && (
-                            <div className="mt-2 space-y-1">
-                                {sanctions.sanctions.map((s, i) => (
+                            return (
+                                <>
                                     <div
-                                        key={i}
-                                        className={`p-3 border flex flex-col gap-1 ${
-                                            sanctions.risk_level === 'high' ||
-                                            sanctions.risk_level === 'critical'
-                                                ? 'bg-red-500/5 border-red-500/10'
-                                                : sanctions.risk_level === 'medium'
+                                        className={`mt-4 p-4 border flex items-center justify-between gap-4 ${
+                                            loading.sanctions
+                                                ? 'bg-zinc-900 border-zinc-800'
+                                                : hasSanctionsError
                                                   ? 'bg-amber-500/5 border-amber-500/10'
-                                                  : 'bg-emerald-500/5 border-emerald-500/10'
+                                                  : isOfficiallySanctioned
+                                                    ? 'bg-red-500/5 border-red-500/10'
+                                                    : 'bg-emerald-500/5 border-emerald-500/10'
                                         }`}
                                     >
-                                        <div className="flex items-start justify-between gap-4">
-                                            <span
-                                                className={`text-[11px] font-black uppercase tracking-tight leading-tight ${
-                                                    sanctions.risk_level === 'high' ||
-                                                    sanctions.risk_level === 'critical'
-                                                        ? 'text-red-400'
-                                                        : sanctions.risk_level === 'medium'
-                                                          ? 'text-amber-400'
-                                                          : 'text-emerald-400'
-                                                }`}
-                                            >
-                                                {s.name}
-                                            </span>
-                                            <a
-                                                href={
-                                                    s.source === 'sanctions_network'
-                                                        ? 'https://sanctions.network/'
-                                                        : 'https://fleetleaks.com/'
-                                                }
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="flex items-center gap-1.5 text-[9px] text-zinc-500 font-bold uppercase hover:text-zinc-300 transition-colors underline decoration-zinc-700 underline-offset-2 shrink-0"
-                                            >
-                                                <ExternalProviderIcon
-                                                    name={s.source}
-                                                    className="w-3 h-3"
-                                                />
-                                                {s.source.replace('_', ' ')}
-                                            </a>
-                                        </div>
-                                        {s.matched_name && (
-                                            <div className="text-[9px] text-zinc-600">
-                                                Match:{' '}
-                                                <span className="text-zinc-400">
-                                                    {s.matched_name}
-                                                </span>
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            {loading.sanctions ? (
+                                                <div className="w-8 h-8 bg-zinc-800 animate-pulse" />
+                                            ) : hasSanctionsError ? (
+                                                <FaCircleExclamation className="text-amber-500 w-8 h-8 shrink-0" />
+                                            ) : isOfficiallySanctioned ? (
+                                                <FaCircleExclamation className="text-red-500 w-8 h-8 shrink-0" />
+                                            ) : (
+                                                <FaCircleCheck className="text-emerald-500 w-8 h-8 shrink-0" />
+                                            )}
+                                            <div className="min-w-0">
+                                                <div
+                                                    className={`text-sm font-black uppercase tracking-tight truncate ${
+                                                        loading.sanctions
+                                                            ? 'text-zinc-500'
+                                                            : hasSanctionsError
+                                                              ? 'text-amber-500'
+                                                              : isOfficiallySanctioned
+                                                                ? 'text-red-500'
+                                                                : 'text-emerald-500'
+                                                    }`}
+                                                >
+                                                    {loading.sanctions
+                                                        ? 'Verifying...'
+                                                        : hasSanctionsError
+                                                          ? 'Check Failed'
+                                                          : isOfficiallySanctioned
+                                                            ? 'Sanctioned'
+                                                            : 'Clear'}
+                                                </div>
+                                                <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-tight">
+                                                    {loading.sanctions
+                                                        ? 'Checking databases'
+                                                        : hasSanctionsError
+                                                          ? 'Unable to reach sources'
+                                                          : isOfficiallySanctioned
+                                                            ? `${officialSanctions.length} ${officialSanctions.length === 1 ? 'official list' : 'official lists'} matched`
+                                                            : 'SDN & UN verified'}
+                                                </div>
                                             </div>
-                                        )}
+                                        </div>
                                     </div>
-                                ))}
-                            </div>
-                        )}
+
+                                    {sanctions && !loading.sanctions && (
+                                        <div className="mt-4 space-y-6">
+                                            {/* Official Designations Section */}
+                                            {officialSanctions.length > 0 && (
+                                                <div className="space-y-2">
+                                                    <div className="text-[10px] font-black text-red-500 uppercase tracking-widest">
+                                                        Official Designations
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        {officialSanctions.map((s, i) => (
+                                                            <div
+                                                                key={i}
+                                                                className="p-3 border bg-red-500/5 border-red-500/10 flex flex-col gap-2.5"
+                                                            >
+                                                                <div className="flex items-start justify-between gap-4">
+                                                                    <div className="flex flex-col gap-1.5 min-w-0">
+                                                                        <span className="text-[11px] font-black uppercase tracking-tight leading-tight truncate text-red-400">
+                                                                            {s.name}
+                                                                        </span>
+                                                                        {s.sanctioned_by &&
+                                                                            s.sanctioned_by.length >
+                                                                                0 && (
+                                                                                <div className="flex flex-col gap-1">
+                                                                                    {s.sanctioned_by.map(
+                                                                                        (code) => {
+                                                                                            const info =
+                                                                                                SANCTIONER_MAPPING[
+                                                                                                    code.toLowerCase()
+                                                                                                ];
+                                                                                            return (
+                                                                                                <div
+                                                                                                    key={
+                                                                                                        code
+                                                                                                    }
+                                                                                                    className="flex flex-col py-1 border-l-2 border-red-500/20 pl-2"
+                                                                                                >
+                                                                                                    <span className="text-[9px] font-black text-zinc-300 uppercase tracking-tight">
+                                                                                                        {info
+                                                                                                            ? info.name
+                                                                                                            : code.toUpperCase()}
+                                                                                                    </span>
+                                                                                                    <span className="text-[8px] text-zinc-500 font-bold uppercase tracking-widest">
+                                                                                                        {info
+                                                                                                            ? info.body
+                                                                                                            : 'OFFICIAL WATCHLIST'}
+                                                                                                    </span>
+                                                                                                </div>
+                                                                                            );
+                                                                                        }
+                                                                                    )}
+                                                                                </div>
+                                                                            )}
+                                                                    </div>
+                                                                    <a
+                                                                        href={
+                                                                            s.link ||
+                                                                            'https://fleetleaks.com/'
+                                                                        }
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="flex items-center gap-1.5 text-[9px] text-red-400/60 font-bold uppercase hover:text-red-400 transition-colors underline decoration-red-900 underline-offset-2 shrink-0 self-start mt-0.5"
+                                                                    >
+                                                                        <ExternalProviderIcon
+                                                                            name={s.source}
+                                                                            className="w-3 h-3 opacity-60"
+                                                                        />
+                                                                        FleetLeaks
+                                                                    </a>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Network Analysis Section */}
+                                            {networkMatches.length > 0 && (
+                                                <div className="space-y-2">
+                                                    <div className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+                                                        Network Analysis
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        {networkMatches.map((s, i) => (
+                                                            <div
+                                                                key={i}
+                                                                className="p-3 border border-white/10 bg-white/5 flex flex-col gap-1"
+                                                            >
+                                                                <div className="flex items-start justify-between gap-4">
+                                                                    <div className="flex flex-col gap-0.5 min-w-0">
+                                                                        <span className="text-[11px] font-black uppercase tracking-tight leading-tight truncate text-zinc-300">
+                                                                            {s.name}
+                                                                        </span>
+                                                                        <div className="text-[8px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">
+                                                                            Matched on name
+                                                                            similarity
+                                                                        </div>
+                                                                    </div>
+                                                                    <a
+                                                                        href={
+                                                                            s.link ||
+                                                                            (s.source ===
+                                                                            'fleetleaks'
+                                                                                ? 'https://fleetleaks.com/'
+                                                                                : 'https://sanctions.network/')
+                                                                        }
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="flex items-center gap-1.5 text-[9px] text-zinc-500 font-bold uppercase hover:text-zinc-300 transition-colors underline decoration-zinc-800 underline-offset-2 shrink-0 self-start mt-0.5"
+                                                                    >
+                                                                        <ExternalProviderIcon
+                                                                            name={s.source}
+                                                                            className="w-3 h-3 opacity-50"
+                                                                        />
+                                                                        {s.source === 'fleetleaks'
+                                                                            ? 'FleetLeaks'
+                                                                            : 'Sanctions Network'}
+                                                                    </a>
+                                                                </div>
+                                                                {s.matched_name && (
+                                                                    <div className="text-[9px] text-zinc-600 mt-0.5">
+                                                                        Match:{' '}
+                                                                        <span className="text-zinc-400">
+                                                                            {s.matched_name}
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </>
+                            );
+                        })()}
                     </section>
 
                     <section className={loading.history ? 'animate-pulse opacity-50' : ''}>
