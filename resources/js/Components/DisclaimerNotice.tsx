@@ -37,7 +37,13 @@ export default function DisclaimerNotice({ onAccept }: DisclaimerNoticeProps) {
             <div className="bg-zinc-950 border border-white/10 w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-4 duration-500">
                 {/* Header */}
                 <div className="bg-zinc-900/50 border-b border-white/5 px-5 py-4 flex items-center gap-3">
-                    <img src="/images/logo.png" alt="SIST" className="h-6 w-auto" />
+                    <img
+                        src="/images/logo.png"
+                        alt=""
+                        width="128"
+                        height="32"
+                        className="h-6 w-auto"
+                    />
                     <div>
                         <h2
                             id="disclaimer-title"
