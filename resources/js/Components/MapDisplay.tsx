@@ -308,7 +308,7 @@ function FleetLayer({
 
     const visibleVessels = useMemo(() => {
         const filtered: ClusteredVessel[] = [];
-        const minDistancePx = zoom < 6 ? 10 : zoom < 11 ? 6 : 0;
+        const minDistancePx = zoom < 6 ? 30 : zoom < 10 ? 15 : 0;
 
         if (minDistancePx === 0) {
             return windowVessels.map((v) => ({ ...v, isCluster: false, clusterCount: 1 }));
@@ -335,7 +335,11 @@ function FleetLayer({
             }
         });
 
-        return filtered;
+        // Ensure isCluster is only true if there are actually multiple vessels
+        return filtered.map((v) => ({
+            ...v,
+            isCluster: v.isCluster && v.clusterCount > 1,
+        }));
     }, [windowVessels, map, zoom, selectedMmsi]);
 
     const getAreaName = useCallback((lat: number, lng: number, currentZoom: number) => {
@@ -556,7 +560,6 @@ function FleetLayer({
                         interactive={true}
                         bubblingMouseEvents={false}
                         riseOnHover={true}
-                        title={`Vessel: ${vessel.name} (MMSI: ${vessel.mmsi})`}
                         icon={createVesselIcon(
                             vessel.course || 0,
                             vessel.isCluster,
