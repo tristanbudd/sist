@@ -58,7 +58,7 @@ export default function DisclaimerNotice({ onAccept }: DisclaimerNoticeProps) {
                 </div>
 
                 {/* Content */}
-                <div id="disclaimer-description" className="p-6 pb-2 space-y-6">
+                <div id="disclaimer-description" className="p-6 pb-6 sm:pb-0 space-y-6">
                     <section className="flex gap-4">
                         <FaInfoCircle
                             className="w-3.5 h-3.5 text-zinc-500 mt-1 shrink-0"

@@ -72,6 +72,9 @@ interface ClusteredVessel extends Vessel {
 const IGNORED_VESSEL_NAMES = ['--'];
 
 function normalizeVessels(raw: Vessel[]): Vessel[] {
+    // Deduplicates raw vessel data by MMSI.
+    // AIS data frequently contains overlapping or malformed broadcasts (e.g., ships named "--").
+    // This logic ensures that if multiple records exist for the same MMSI, the one with a "useful" name is kept.
     const byMmsi = new Map<number, Vessel>();
 
     for (const vessel of raw) {
@@ -132,10 +135,10 @@ function FleetLayer({
     const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const trackedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
-    const [lastActivity, setLastActivity] = useState(() => Date.now());
-    const [isIdle, setIsIdle] = useState(false);
     const suppressNextMapClickRef = useRef(false);
     const lastClusterInteractionRef = useRef<{ mmsi: number; at: number } | null>(null);
+    const [lastActivity, setLastActivity] = useState(() => Date.now());
+    const [isIdle, setIsIdle] = useState(false);
     const IDLE_THRESHOLD = 120000;
 
     const recordActivity = useCallback(() => {
@@ -158,6 +161,8 @@ function FleetLayer({
             const currentZoom = map.getZoom();
 
             try {
+                // Fetch only vessels within the current viewport bounds to optimize rendering and database queries
+                // age_minutes limits results to recently active vessels for performance
                 // TODO: Change to relative path once finished with dev
                 const response = await axios.get('https://sist.tristanbudd.com/api/v1/vessels', {
                     signal: controller.signal,
@@ -235,6 +240,7 @@ function FleetLayer({
     }, [isIdle]);
 
     const debouncedFetch = useCallback(() => {
+        // Debounce map movement events to prevent spamming the API while the user is actively panning or zooming
         if (fetchTimer.current) {
             clearTimeout(fetchTimer.current);
         }
@@ -279,13 +285,20 @@ function FleetLayer({
     });
 
     useEffect(() => {
+        const handleGlobalClick = () => recordActivity();
+        window.addEventListener('click', handleGlobalClick);
+
         const interval = setInterval(() => {
             if (Date.now() - lastActivity > IDLE_THRESHOLD) {
                 setIsIdle(true);
             }
         }, 5000);
-        return () => clearInterval(interval);
-    }, [lastActivity]);
+
+        return () => {
+            window.removeEventListener('click', handleGlobalClick);
+            clearInterval(interval);
+        };
+    }, [lastActivity, recordActivity]);
 
     useEffect(() => {
         const initializeMapData = async () => {
@@ -308,18 +321,23 @@ function FleetLayer({
 
     const visibleVessels = useMemo(() => {
         const filtered: ClusteredVessel[] = [];
-        const minDistancePx = zoom < 6 ? 10 : zoom < 11 ? 6 : 0;
+
+        // Dynamically adjust the pixel radius for clustering based on zoom level
+        // At zoom level 10 and above, clustering is completely disabled to ensure distinct ship selection
+        const minDistancePx = zoom < 6 ? 30 : zoom < 10 ? 15 : 0;
 
         if (minDistancePx === 0) {
             return windowVessels.map((v) => ({ ...v, isCluster: false, clusterCount: 1 }));
         }
 
         windowVessels.forEach((vessel) => {
+            // Selected vessels bypass clustering to remain interactive
             if (vessel.mmsi === selectedMmsi) {
                 filtered.push({ ...vessel, isCluster: false, clusterCount: 1 });
                 return;
             }
 
+            // Convert geographical coordinates to screen pixels for distance comparison
             const pos = map.latLngToLayerPoint([vessel.lat, vessel.lng]);
             const clusterIndex = filtered.findIndex((f) => {
                 const fPos = map.latLngToLayerPoint([f.lat, f.lng]);
@@ -335,7 +353,11 @@ function FleetLayer({
             }
         });
 
-        return filtered;
+        // Ensure isCluster is only true if there are actually multiple vessels
+        return filtered.map((v) => ({
+            ...v,
+            isCluster: v.isCluster && v.clusterCount > 1,
+        }));
     }, [windowVessels, map, zoom, selectedMmsi]);
 
     const getAreaName = useCallback((lat: number, lng: number, currentZoom: number) => {
@@ -556,7 +578,6 @@ function FleetLayer({
                         interactive={true}
                         bubblingMouseEvents={false}
                         riseOnHover={true}
-                        title={`Vessel: ${vessel.name} (MMSI: ${vessel.mmsi})`}
                         icon={createVesselIcon(
                             vessel.course || 0,
                             vessel.isCluster,
