@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import portsGeoJson from '../../data/ports.json';
 import countriesJson from '../../data/countries.json';
 import citiesJson from '../../data/cities.json';
@@ -60,6 +60,10 @@ interface Coordinates {
     lat: number;
     lng: number;
 }
+
+type NavigableItem =
+    | { type: 'result'; data: SearchResult }
+    | { type: 'expand'; category: string; label: string };
 
 interface HeaderBarProps {
     onNavigate?: (lat: number, lng: number, zoom: number) => void;
@@ -204,8 +208,23 @@ export default function HeaderBar({
         port: 5,
         city: 5,
     });
+    const [selectedIndex, setSelectedIndex] = useState(-1);
     const [error, setError] = useState<string | null>(null);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
     const activeQuery = selectedVesselName ?? query;
+
+    useEffect(() => {
+        if (selectedIndex >= 0 && scrollContainerRef.current) {
+            const selectedElement =
+                scrollContainerRef.current.querySelector('[data-selected="true"]');
+            if (selectedElement) {
+                selectedElement.scrollIntoView({
+                    block: 'nearest',
+                    behavior: 'smooth',
+                });
+            }
+        }
+    }, [selectedIndex]);
 
     const handleLogoClick = () => {
         if (isRefreshing) return;
@@ -281,6 +300,33 @@ export default function HeaderBar({
         });
     }, [activeQuery, allResults]);
 
+    const visibleItems = useMemo(() => {
+        const items: NavigableItem[] = [];
+        ['country', 'city', 'continent', 'ocean', 'vessel', 'port'].forEach((cat) => {
+            const catItems = suggestions.filter((i) => i.category === cat);
+            const displayed = catItems.slice(0, categoryLimits[cat]);
+
+            displayed.forEach((d) => items.push({ type: 'result', data: d }));
+
+            if (catItems.length > categoryLimits[cat]) {
+                const label =
+                    cat === 'vessel'
+                        ? 'Vessels'
+                        : cat === 'port'
+                          ? 'Ports'
+                          : cat === 'country'
+                            ? 'Countries'
+                            : cat === 'city'
+                              ? 'Cities / Towns'
+                              : cat === 'continent'
+                                ? 'Continents'
+                                : 'Oceans';
+                items.push({ type: 'expand', category: cat, label });
+            }
+        });
+        return items;
+    }, [suggestions, categoryLimits]);
+
     const showSuggestionsPanel = showSuggestions && !error && suggestions.length > 0;
 
     const handleSelect = (item: SearchResult) => {
@@ -322,10 +368,29 @@ export default function HeaderBar({
             city: 5,
         });
         setError(null);
+        setSelectedIndex(-1);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') {
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setSelectedIndex((prev) => Math.min(prev + 1, visibleItems.length - 1));
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setSelectedIndex((prev) => Math.max(prev - 1, -1));
+        } else if (e.key === 'Enter') {
+            if (selectedIndex >= 0 && visibleItems[selectedIndex]) {
+                const item = visibleItems[selectedIndex];
+                if (item.type === 'result') {
+                    handleSelect(item.data);
+                } else {
+                    setCategoryLimits((prev) => ({
+                        ...prev,
+                        [item.category]: prev[item.category] + 5,
+                    }));
+                }
+                return;
+            }
             const q = activeQuery.trim();
             const coords = parseVesselCoords(q);
 
@@ -411,6 +476,7 @@ export default function HeaderBar({
                                 onVesselSelect(null);
                             }
                             setQuery(e.target.value);
+                            setSelectedIndex(-1);
                             setCategoryLimits({
                                 country: 5,
                                 continent: 3,
@@ -438,7 +504,10 @@ export default function HeaderBar({
                 )}
 
                 {showSuggestionsPanel && (
-                    <div className="absolute top-full left-0 right-0 bg-zinc-950 border-x border-b border-white/20 shadow-2xl mt-px max-h-[60vh] overflow-y-auto">
+                    <div
+                        ref={scrollContainerRef}
+                        className="absolute top-full left-0 right-0 bg-zinc-950 border-x border-b border-white/20 shadow-2xl mt-px max-h-[60vh] overflow-y-auto"
+                    >
                         {!activeQuery.trim() && (
                             <div className="px-4 py-2 border-b border-white/5 bg-white/2">
                                 <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-[0.2em]">
@@ -487,38 +556,58 @@ export default function HeaderBar({
                                             </span>
                                         </div>
                                     </div>
-                                    {displayed.map((item, idx) => (
-                                        <button
-                                            key={`${cat}-${idx}`}
-                                            onClick={() => handleSelect(item)}
-                                            className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-none text-left"
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <Icon className="text-zinc-500 w-3 h-3" />
-                                                <div className="flex flex-col">
-                                                    <span className="text-white text-[11px] font-bold">
-                                                        {item.name}
-                                                    </span>
-                                                    <span className="text-zinc-500 text-[9px] font-mono uppercase">
-                                                        {cat === 'vessel'
-                                                            ? `MMSI: ${(item as Vessel).mmsi} | IMO: ${(item as Vessel).imo || 'Unknown'}`
-                                                            : cat === 'port'
-                                                              ? `CODE: ${(item as Port).code} | ${(item as Port).country}`
-                                                              : cat === 'country'
-                                                                ? `ISO: ${(item as Country).cca2}`
-                                                                : cat === 'city'
-                                                                  ? `COUNTRY: ${(item as City).country} (${(item as City).iso})`
-                                                                  : cat === 'continent'
-                                                                    ? 'Region'
-                                                                    : 'Water Body'}
-                                                    </span>
+                                    {displayed.map((item, idx) => {
+                                        const globalIdx = visibleItems.findIndex(
+                                            (vi) => vi.type === 'result' && vi.data === item
+                                        );
+                                        const isSelected = globalIdx === selectedIndex;
+                                        return (
+                                            <button
+                                                key={`${cat}-${idx}`}
+                                                data-selected={isSelected}
+                                                onClick={() => handleSelect(item)}
+                                                className={`w-full flex items-center justify-between px-4 py-3 transition-colors border-b border-white/5 last:border-none text-left ${
+                                                    isSelected ? 'bg-white/10' : 'hover:bg-white/5'
+                                                }`}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <Icon
+                                                        className={`w-3 h-3 ${isSelected ? 'text-white' : 'text-zinc-500'}`}
+                                                    />
+                                                    <div className="flex flex-col">
+                                                        <span className="text-white text-[11px] font-bold">
+                                                            {item.name}
+                                                        </span>
+                                                        <span
+                                                            className={`text-[9px] font-mono uppercase ${isSelected ? 'text-zinc-300' : 'text-zinc-500'}`}
+                                                        >
+                                                            {cat === 'vessel'
+                                                                ? `MMSI: ${(item as Vessel).mmsi} | IMO: ${(item as Vessel).imo || 'Unknown'}`
+                                                                : cat === 'port'
+                                                                  ? `CODE: ${(item as Port).code} | ${(item as Port).country}`
+                                                                  : cat === 'country'
+                                                                    ? `ISO: ${(item as Country).cca2}`
+                                                                    : cat === 'city'
+                                                                      ? `COUNTRY: ${(item as City).country} (${(item as City).iso})`
+                                                                      : cat === 'continent'
+                                                                        ? 'Region'
+                                                                        : 'Water Body'}
+                                                        </span>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </button>
-                                    ))}
+                                            </button>
+                                        );
+                                    })}
                                     {catItems.length > categoryLimits[cat] && (
                                         <button
                                             type="button"
+                                            data-selected={
+                                                selectedIndex ===
+                                                visibleItems.findIndex(
+                                                    (vi) =>
+                                                        vi.type === 'expand' && vi.category === cat
+                                                )
+                                            }
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 setCategoryLimits((prev) => ({
@@ -526,7 +615,15 @@ export default function HeaderBar({
                                                     [cat]: prev[cat] + 5,
                                                 }));
                                             }}
-                                            className="w-full py-2 bg-white/2 hover:bg-white/5 text-[9px] text-zinc-400 hover:text-white font-bold uppercase tracking-widest transition-colors border-b border-white/5"
+                                            className={`w-full py-2 text-[9px] font-bold uppercase tracking-widest transition-colors border-b border-white/5 ${
+                                                selectedIndex ===
+                                                visibleItems.findIndex(
+                                                    (vi) =>
+                                                        vi.type === 'expand' && vi.category === cat
+                                                )
+                                                    ? 'bg-white/10 text-white'
+                                                    : 'bg-white/2 hover:bg-white/5 text-zinc-400 hover:text-white'
+                                            }`}
                                         >
                                             Show more {label}
                                         </button>
