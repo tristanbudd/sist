@@ -50,6 +50,8 @@ class VesselController extends Controller
     {
         $query = Vessel::query();
 
+        // Time window filtering is critical for DB performance
+        // Without this, the query would scan millions of historical vessel records
         $age = $request->input('age_minutes', 60);
         $query->where('last_seen_at', '>=', now()->subMinutes($age));
 
@@ -57,6 +59,8 @@ class VesselController extends Controller
         $query->whereNotNull('name')
             ->whereNotIn('name', $ignoredNames);
 
+        // Spatial bounding box query
+        // Only queries for vessels physically visible within the user's current map viewport coordinates
         if ($request->has(['sw_lat', 'sw_lng', 'ne_lat', 'ne_lng'])) {
             $query->whereBetween('lat', [(float) $request->sw_lat, (float) $request->ne_lat])
                 ->whereBetween('lng', [(float) $request->sw_lng, (float) $request->ne_lng]);
@@ -240,6 +244,7 @@ class VesselController extends Controller
             ]);
 
         // Transform to pair numeric values with their text equivalents
+        // Note: 'nav_status_text' is not a database column; it is generated dynamically via an Eloquent accessor on the VesselPosition model
         $history = $positions->map(function ($position) {
             return [
                 'lat' => $position->lat,

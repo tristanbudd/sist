@@ -72,6 +72,9 @@ interface ClusteredVessel extends Vessel {
 const IGNORED_VESSEL_NAMES = ['--'];
 
 function normalizeVessels(raw: Vessel[]): Vessel[] {
+    // Deduplicates raw vessel data by MMSI.
+    // AIS data frequently contains overlapping or malformed broadcasts (e.g., ships named "--").
+    // This logic ensures that if multiple records exist for the same MMSI, the one with a "useful" name is kept.
     const byMmsi = new Map<number, Vessel>();
 
     for (const vessel of raw) {
@@ -158,6 +161,8 @@ function FleetLayer({
             const currentZoom = map.getZoom();
 
             try {
+                // Fetch only vessels within the current viewport bounds to optimize rendering and database queries
+                // age_minutes limits results to recently active vessels for performance
                 // TODO: Change to relative path once finished with dev
                 const response = await axios.get('https://sist.tristanbudd.com/api/v1/vessels', {
                     signal: controller.signal,
@@ -235,6 +240,7 @@ function FleetLayer({
     }, [isIdle]);
 
     const debouncedFetch = useCallback(() => {
+        // Debounce map movement events to prevent spamming the API while the user is actively panning or zooming
         if (fetchTimer.current) {
             clearTimeout(fetchTimer.current);
         }
@@ -308,6 +314,9 @@ function FleetLayer({
 
     const visibleVessels = useMemo(() => {
         const filtered: ClusteredVessel[] = [];
+
+        // Dynamically adjust the pixel radius for clustering based on zoom level
+        // At zoom level 10 and above, clustering is completely disabled to ensure distinct ship selection
         const minDistancePx = zoom < 6 ? 30 : zoom < 10 ? 15 : 0;
 
         if (minDistancePx === 0) {
@@ -315,11 +324,13 @@ function FleetLayer({
         }
 
         windowVessels.forEach((vessel) => {
+            // Selected vessels bypass clustering to remain interactive
             if (vessel.mmsi === selectedMmsi) {
                 filtered.push({ ...vessel, isCluster: false, clusterCount: 1 });
                 return;
             }
 
+            // Convert geographical coordinates to screen pixels for distance comparison
             const pos = map.latLngToLayerPoint([vessel.lat, vessel.lng]);
             const clusterIndex = filtered.findIndex((f) => {
                 const fPos = map.latLngToLayerPoint([f.lat, f.lng]);

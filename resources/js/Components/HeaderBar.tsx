@@ -374,6 +374,8 @@ export default function HeaderBar({
 
     const handleSelect = (item: SearchResult) => {
         setRecentSearches((prev) => {
+            // Deduplicate recent searches before prepending the new item
+            // We must explicitly check MMSI for vessels because multiple distinct vessels might share the same name
             const filtered = prev.filter(
                 (r) =>
                     !(
@@ -565,6 +567,9 @@ export default function HeaderBar({
                     <input
                         type="text"
                         value={activeQuery}
+                        // WAI-ARIA 1.2 Combobox Pattern
+                        // aria-activedescendant dynamically links the input to the currently highlighted listbox item
+                        // This allows screen readers to announce the highlighted item during keyboard navigation without moving DOM focus
                         role="combobox"
                         aria-autocomplete="list"
                         aria-expanded={showSuggestionsPanel}

@@ -247,6 +247,8 @@ class SanctionsService
 
                 $isMatch = false;
 
+                // Tier 1: Exact Numeric Identifier Match (Highest Confidence)
+                // IMO and MMSI are prioritized over names because vessel names frequently change or are shared
                 if ($targetImo !== '' && $imoCandidate !== '') {
                     if ($targetImo === $imoCandidate) {
                         $isMatch = true;
@@ -269,6 +271,9 @@ class SanctionsService
                     }
                 }
 
+                // Tier 2: Fuzzy Name Match (Informational)
+                // Substring matching is used as a fallback but must be treated carefully
+                // 'Ocean' matching 'Ocean Explorer' triggers a fuzzy match, which prevents it from being flagged as a high-confidence Official Designation
                 $isFuzzyMatch = false;
                 if (! $isMatch && $targetName !== '' && $nameCandidate !== '') {
                     if (str_contains($targetName, $nameCandidate) || str_contains($nameCandidate, $targetName)) {
@@ -388,6 +393,8 @@ class SanctionsService
         ?string $mmsi,
         ?string $callSign
     ): string {
+        // Ensures the API always has a string to query against even if the AIS broadcast lacks a vessel name
+        // Prefixes prevent raw numbers from inadvertently matching short, numeric vessel names
         $candidate = trim((string) $vesselName);
 
         if ($candidate !== '') {

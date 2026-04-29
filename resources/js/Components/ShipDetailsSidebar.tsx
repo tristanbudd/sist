@@ -224,6 +224,8 @@ export default function ShipDetailsSidebar({
 
     const fetchAllData = useCallback(
         async (mmsi: number, signal?: AbortSignal) => {
+            // Executes multiple API requests concurrently to populate the sidebar panels
+            // Relies on AbortSignal to cancel pending requests if the user quickly selects another vessel, preventing state race conditions
             let detailsData: VesselDetails | null = null;
             try {
                 const res = await axios.get(`https://sist.tristanbudd.com/api/v1/vessels/${mmsi}`, {
@@ -305,6 +307,9 @@ export default function ShipDetailsSidebar({
                 );
                 let data = res.data.history || [];
 
+                // Synchronizes the historical breadcrumb trail with the live vessel details
+                // The history endpoint might lag slightly behind the live status endpoint.
+                // If the live status has a newer, geographically distinct position, we manually inject it at the head of the trail.
                 if (detailsData) {
                     const latestHistory = data.length > 0 ? data[0] : null;
                     const detailsTime = new Date(detailsData.last_seen_at || Date.now()).getTime();
@@ -350,6 +355,8 @@ export default function ShipDetailsSidebar({
     const generatedLinks = useMemo<ExternalLink[]>(() => {
         if (!vessel) return [];
         const mmsi = vessel.mmsi;
+        // The IMO number is a permanent hull identifier that never changes during a ship's lifetime
+        // MMSI numbers can change if the vessel changes its registration flag, making IMO much more reliable for external database lookups
         const imo = details?.imo || vessel.imo;
 
         return [
@@ -398,6 +405,8 @@ export default function ShipDetailsSidebar({
         if (history.length === 0) return [];
         const result: (HistoryPosition & { mergedCount: number })[] = [];
 
+        // Optimizes map rendering performance by filtering out redundant historical waypoints
+        // Sequential points that fall within a tiny geographical radius (0.0005 degrees) are merged into a single node
         history.forEach((pos) => {
             if (result.length === 0) {
                 result.push({ ...pos, mergedCount: 1 });
