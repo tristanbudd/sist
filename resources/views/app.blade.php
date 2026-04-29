@@ -54,7 +54,7 @@
         <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@100..900&family=Geist:wght@100..900&display=swap" rel="stylesheet">
 
         <!-- Scripts -->
-        @routes
+        @routes(nonce: app('csp_nonce'))
         @viteReactRefresh
         @vite(['resources/js/app.tsx'])
         @inertiaHead
