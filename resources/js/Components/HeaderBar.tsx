@@ -557,7 +557,7 @@ export default function HeaderBar({
             </div>
 
             <div className="relative w-full sm:px-0 sm:max-w-[400px] min-[960px]:absolute min-[960px]:left-1/2 min-[960px]:-translate-x-1/2 pointer-events-auto z-10">
-                <div className="relative flex items-center gap-3 bg-zinc-950 border border-white/20 px-4 py-5 shadow-2xl transition-all focus-within:border-white/40 focus-within:ring-1 focus-within:ring-white/10">
+                <div className="relative flex items-center gap-3 bg-zinc-950 border border-white/20 px-4 py-3 shadow-2xl transition-all focus-within:border-white/40 focus-within:ring-1 focus-within:ring-white/10">
                     <FaSearch
                         className={`w-4 h-4 ${query ? 'text-white' : 'text-zinc-500'}`}
                         aria-hidden="true"
