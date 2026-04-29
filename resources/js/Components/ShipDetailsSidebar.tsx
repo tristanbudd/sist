@@ -1397,12 +1397,14 @@ export default function ShipDetailsSidebar({
             {isMinimized && (
                 <button
                     onClick={() => setIsMinimized(false)}
-                    className="sm:hidden fixed bottom-[44px] left-1/2 -translate-x-1/2 z-2000 bg-zinc-950/90 backdrop-blur-xl border border-white/20 px-6 py-3 shadow-2xl animate-in slide-in-from-bottom-4 duration-300 flex items-center gap-3 active:scale-95 transition-all"
+                    className="sm:hidden fixed bottom-12 left-1/2 -translate-x-1/2 z-1000 bg-zinc-950/90 backdrop-blur-xl border border-white/20 px-6 py-3 shadow-2xl animate-in slide-in-from-bottom-4 duration-300 flex items-center gap-3 active:scale-95 transition-all"
                     title="Restore Details"
                 >
-                    <FaLocationDot className="text-zinc-400 w-3 h-3" />
+                    <FaLocationDot className="text-white w-3 h-3" />
                     <span className="text-[10px] font-black text-white uppercase tracking-[0.2em] whitespace-nowrap">
-                        Show Details: {details?.name || vessel.name || 'Unknown'}
+                        {(details?.name || vessel.name || '').length > 14
+                            ? 'Show Vessel Details'
+                            : `Show Details: ${details?.name || vessel.name || 'Unknown'}`}
                     </span>
                 </button>
             )}

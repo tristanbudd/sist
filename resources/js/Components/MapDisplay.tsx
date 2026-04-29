@@ -135,10 +135,10 @@ function FleetLayer({
     const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const trackedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
-    const [lastActivity, setLastActivity] = useState(() => Date.now());
-    const [isIdle, setIsIdle] = useState(false);
     const suppressNextMapClickRef = useRef(false);
     const lastClusterInteractionRef = useRef<{ mmsi: number; at: number } | null>(null);
+    const [lastActivity, setLastActivity] = useState(() => Date.now());
+    const [isIdle, setIsIdle] = useState(false);
     const IDLE_THRESHOLD = 120000;
 
     const recordActivity = useCallback(() => {
@@ -285,13 +285,20 @@ function FleetLayer({
     });
 
     useEffect(() => {
+        const handleGlobalClick = () => recordActivity();
+        window.addEventListener('click', handleGlobalClick);
+
         const interval = setInterval(() => {
             if (Date.now() - lastActivity > IDLE_THRESHOLD) {
                 setIsIdle(true);
             }
         }, 5000);
-        return () => clearInterval(interval);
-    }, [lastActivity]);
+
+        return () => {
+            window.removeEventListener('click', handleGlobalClick);
+            clearInterval(interval);
+        };
+    }, [lastActivity, recordActivity]);
 
     useEffect(() => {
         const initializeMapData = async () => {
