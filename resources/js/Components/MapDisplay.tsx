@@ -542,9 +542,7 @@ function FleetLayer({
                             Resume Tracking
                         </button>
 
-                        <span className="text-[9px] text-zinc-600 italic">
-                            (Inactive for 2 minutes)
-                        </span>
+                        <span className="text-[9px] text-zinc-600">(Inactive for 2 minutes)</span>
                     </div>
                 </div>
             )}
