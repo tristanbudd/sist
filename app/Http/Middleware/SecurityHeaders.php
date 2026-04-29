@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Vite;
 use Symfony\Component\HttpFoundation\Response;
 
 class SecurityHeaders
@@ -16,6 +17,11 @@ class SecurityHeaders
      */
     public function handle(Request $request, Closure $next): Response
     {
+        // Generate a cryptographically secure nonce for this request
+        $nonce = base64_encode(random_bytes(16));
+        Vite::useCspNonce($nonce);
+        app()->instance('csp_nonce', $nonce);
+
         $response = $next($request);
 
         // Only apply security headers in non-local environments to avoid blocking Vite dev server
@@ -27,14 +33,15 @@ class SecurityHeaders
             $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
             $response->headers->set('Cross-Origin-Opener-Policy', 'same-origin');
 
-            // Content Security Policy (CSP)
+            // Strong Content Security Policy (CSP)
             $csp = "default-src 'self'; ".
-                   "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://*.googletagmanager.com; ".
+                   "script-src 'self' 'nonce-{$nonce}' 'strict-dynamic' 'unsafe-eval' https:; ".
                    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; ".
-                   "img-src 'self' data: https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://cdnjs.cloudflare.com https://www.google.com https://*.googletagmanager.com; ".
+                   "img-src 'self' data: https:; ".
                    "font-src 'self' https://fonts.gstatic.com; ".
                    "connect-src 'self' https://sist.tristanbudd.com wss://* https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com; ".
                    "frame-ancestors 'none'; ".
+                   "require-trusted-types-for 'script'; ".
                    'upgrade-insecure-requests';
 
             $response->headers->set('Content-Security-Policy', $csp);
