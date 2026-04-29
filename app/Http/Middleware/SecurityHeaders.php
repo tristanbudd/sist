@@ -29,11 +29,11 @@ class SecurityHeaders
 
             // Content Security Policy (CSP)
             $csp = "default-src 'self'; ".
-                   "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://www.googletagmanager.com; ".
+                   "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://*.googletagmanager.com; ".
                    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; ".
-                   "img-src 'self' data: https://*.tile.openstreetmap.org https://cdnjs.cloudflare.com https://www.google.com https://www.googletagmanager.com; ".
+                   "img-src 'self' data: https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://cdnjs.cloudflare.com https://www.google.com https://*.googletagmanager.com; ".
                    "font-src 'self' https://fonts.gstatic.com; ".
-                   "connect-src 'self' https://sist.tristanbudd.com wss://* https://www.google-analytics.com; ".
+                   "connect-src 'self' https://sist.tristanbudd.com wss://* https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com; ".
                    "frame-ancestors 'none'; ".
                    'upgrade-insecure-requests';
 
