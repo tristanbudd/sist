@@ -3,7 +3,7 @@ import portsGeoJson from '../../data/ports.json';
 import countriesJson from '../../data/countries.json';
 import citiesJson from '../../data/cities.json';
 import { Vessel as MapVessel } from './MapDisplay';
-import { FaSearch, FaShip, FaAnchor, FaGlobe, FaCity } from 'react-icons/fa';
+import { FaSearch, FaShip, FaAnchor, FaGlobe, FaCity, FaHistory, FaTrash } from 'react-icons/fa';
 
 interface Vessel {
     name: string;
@@ -54,7 +54,21 @@ interface City {
     lng: number;
 }
 
-type SearchResult = Vessel | Port | Country | Continent | Ocean | City;
+interface CoordinateSearch {
+    category: 'coordinate';
+    name: string;
+    lat: number;
+    lng: number;
+}
+
+type SearchResult = Vessel | Port | Country | Continent | Ocean | City | CoordinateSearch;
+
+const isVessel = (item: SearchResult): item is Vessel => item.category === 'vessel';
+const isPort = (item: SearchResult): item is Port => item.category === 'port';
+const isCountry = (item: SearchResult): item is Country => item.category === 'country';
+const isCity = (item: SearchResult): item is City => item.category === 'city';
+const isCoordinate = (item: SearchResult): item is CoordinateSearch =>
+    item.category === 'coordinate';
 
 interface Coordinates {
     lat: number;
@@ -63,7 +77,9 @@ interface Coordinates {
 
 type NavigableItem =
     | { type: 'result'; data: SearchResult }
-    | { type: 'expand'; category: string; label: string };
+    | { type: 'recent'; data: SearchResult }
+    | { type: 'expand'; category: string; label: string }
+    | { type: 'clear_recents' };
 
 interface HeaderBarProps {
     onNavigate?: (lat: number, lng: number, zoom: number) => void;
@@ -209,9 +225,25 @@ export default function HeaderBar({
         city: 5,
     });
     const [selectedIndex, setSelectedIndex] = useState(-1);
+    const [recentSearches, setRecentSearches] = useState<SearchResult[]>(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('sist_recent_searches');
+            if (saved) {
+                try {
+                    return JSON.parse(saved);
+                } catch (e) {
+                    console.error('Failed to parse recent searches', e);
+                }
+            }
+        }
+        return [];
+    });
+    const [recentLimit, setRecentLimit] = useState(3);
     const [error, setError] = useState<string | null>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const activeQuery = selectedVesselName ?? query;
+    const isSearchEmpty = !activeQuery.trim();
+    const hasRecents = recentSearches.length > 0;
 
     useEffect(() => {
         if (selectedIndex >= 0 && scrollContainerRef.current) {
@@ -302,6 +334,16 @@ export default function HeaderBar({
 
     const visibleItems = useMemo(() => {
         const items: NavigableItem[] = [];
+
+        if (isSearchEmpty && hasRecents) {
+            const displayedRecents = recentSearches.slice(0, recentLimit);
+            displayedRecents.forEach((d) => items.push({ type: 'recent', data: d }));
+            if (recentSearches.length > recentLimit) {
+                items.push({ type: 'expand', category: 'recent', label: 'Recent Searches' });
+            }
+            items.push({ type: 'clear_recents' });
+        }
+
         ['country', 'city', 'continent', 'ocean', 'vessel', 'port'].forEach((cat) => {
             const catItems = suggestions.filter((i) => i.category === cat);
             const displayed = catItems.slice(0, categoryLimits[cat]);
@@ -325,11 +367,26 @@ export default function HeaderBar({
             }
         });
         return items;
-    }, [suggestions, categoryLimits]);
+    }, [suggestions, categoryLimits, isSearchEmpty, hasRecents, recentSearches, recentLimit]);
 
-    const showSuggestionsPanel = showSuggestions && !error && suggestions.length > 0;
+    const showSuggestionsPanel =
+        showSuggestions && !error && (suggestions.length > 0 || hasRecents);
 
     const handleSelect = (item: SearchResult) => {
+        setRecentSearches((prev) => {
+            const filtered = prev.filter(
+                (r) =>
+                    !(
+                        r.name === item.name &&
+                        r.category === item.category &&
+                        (isVessel(r) && isVessel(item) ? r.mmsi === item.mmsi : true)
+                    )
+            );
+            const updated = [item, ...filtered].slice(0, 20);
+            localStorage.setItem('sist_recent_searches', JSON.stringify(updated));
+            return updated;
+        });
+
         // @ts-expect-error - GTM dataLayer
         window.dataLayer = window.dataLayer || [];
         // @ts-expect-error - GTM dataLayer
@@ -369,6 +426,13 @@ export default function HeaderBar({
         });
         setError(null);
         setSelectedIndex(-1);
+        setRecentLimit(3);
+    };
+
+    const clearRecents = () => {
+        setRecentSearches([]);
+        localStorage.removeItem('sist_recent_searches');
+        setSelectedIndex(-1);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -381,13 +445,19 @@ export default function HeaderBar({
         } else if (e.key === 'Enter') {
             if (selectedIndex >= 0 && visibleItems[selectedIndex]) {
                 const item = visibleItems[selectedIndex];
-                if (item.type === 'result') {
+                if (item.type === 'result' || item.type === 'recent') {
                     handleSelect(item.data);
+                } else if (item.type === 'clear_recents') {
+                    clearRecents();
                 } else {
-                    setCategoryLimits((prev) => ({
-                        ...prev,
-                        [item.category]: prev[item.category] + 5,
-                    }));
+                    if (item.category === 'recent') {
+                        setRecentLimit((prev) => prev + 5);
+                    } else {
+                        setCategoryLimits((prev) => ({
+                            ...prev,
+                            [item.category]: prev[item.category] + 5,
+                        }));
+                    }
                 }
                 return;
             }
@@ -405,8 +475,12 @@ export default function HeaderBar({
                     onNavigate(lat, lng, 12);
                 }
 
-                setError(null);
-                setShowSuggestions(false);
+                handleSelect({
+                    category: 'coordinate',
+                    name: q,
+                    lat,
+                    lng,
+                });
                 return;
             }
 
@@ -508,7 +582,94 @@ export default function HeaderBar({
                         ref={scrollContainerRef}
                         className="absolute top-full left-0 right-0 bg-zinc-950 border-x border-b border-white/20 shadow-2xl mt-px max-h-[60vh] overflow-y-auto"
                     >
-                        {!activeQuery.trim() && (
+                        {isSearchEmpty && hasRecents && (
+                            <div className="border-b border-white/10">
+                                <div className="px-4 py-2 border-b border-white/5 bg-white/2 flex items-center justify-between">
+                                    <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-[0.2em]">
+                                        Recent Searches
+                                    </span>
+                                    <button
+                                        onClick={clearRecents}
+                                        className="text-[8px] text-zinc-600 hover:text-red-400 font-bold uppercase tracking-widest transition-colors flex items-center gap-1.5"
+                                    >
+                                        <FaTrash className="w-2 h-2" />
+                                        Clear
+                                    </button>
+                                </div>
+                                {recentSearches.slice(0, recentLimit).map((item, idx) => {
+                                    const globalIdx = visibleItems.findIndex(
+                                        (vi) => vi.type === 'recent' && vi.data === item
+                                    );
+                                    const isSelected = globalIdx === selectedIndex;
+                                    const Icon =
+                                        item.category === 'vessel'
+                                            ? FaShip
+                                            : item.category === 'port'
+                                              ? FaAnchor
+                                              : item.category === 'city'
+                                                ? FaCity
+                                                : FaGlobe;
+
+                                    return (
+                                        <button
+                                            key={`recent-${idx}`}
+                                            data-selected={isSelected}
+                                            onClick={() => handleSelect(item)}
+                                            className={`w-full flex items-center justify-between px-4 py-3 transition-colors border-b border-white/5 last:border-none text-left ${
+                                                isSelected ? 'bg-white/10' : 'hover:bg-white/5'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <FaHistory
+                                                    className={`w-3 h-3 ${isSelected ? 'text-white' : 'text-zinc-500'}`}
+                                                />
+                                                <div className="flex flex-col">
+                                                    <span className="text-white text-[11px] font-bold">
+                                                        {item.name}
+                                                    </span>
+                                                    <span
+                                                        className={`text-[8px] font-mono uppercase ${isSelected ? 'text-zinc-300' : 'text-zinc-500'}`}
+                                                    >
+                                                        {isVessel(item)
+                                                            ? `MMSI: ${item.mmsi} | IMO: ${item.imo || 'Unknown'}`
+                                                            : isPort(item)
+                                                              ? `CODE: ${item.code} | ${item.country}`
+                                                              : isCountry(item)
+                                                                ? `ISO: ${item.cca2}`
+                                                                : isCity(item)
+                                                                  ? `COUNTRY: ${item.country} (${item.iso})`
+                                                                  : isCoordinate(item)
+                                                                    ? 'Coordinates'
+                                                                    : item.category === 'continent'
+                                                                      ? 'Region'
+                                                                      : 'Water Body'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <Icon className="w-3 h-3 text-white/10" />
+                                        </button>
+                                    );
+                                })}
+                                {recentSearches.length > recentLimit && (
+                                    <button
+                                        onClick={() => setRecentLimit((prev) => prev + 5)}
+                                        className={`w-full py-2 text-[9px] font-bold uppercase tracking-widest transition-colors border-b border-white/5 ${
+                                            selectedIndex ===
+                                            visibleItems.findIndex(
+                                                (vi) =>
+                                                    vi.type === 'expand' && vi.category === 'recent'
+                                            )
+                                                ? 'bg-white/10 text-white'
+                                                : 'bg-white/2 hover:bg-white/5 text-zinc-400 hover:text-white'
+                                        }`}
+                                    >
+                                        Show more Recent
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
+                        {isSearchEmpty && (
                             <div className="px-4 py-2 border-b border-white/5 bg-white/2">
                                 <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-[0.2em]">
                                     Quick Search
@@ -581,15 +742,16 @@ export default function HeaderBar({
                                                         <span
                                                             className={`text-[9px] font-mono uppercase ${isSelected ? 'text-zinc-300' : 'text-zinc-500'}`}
                                                         >
-                                                            {cat === 'vessel'
-                                                                ? `MMSI: ${(item as Vessel).mmsi} | IMO: ${(item as Vessel).imo || 'Unknown'}`
-                                                                : cat === 'port'
-                                                                  ? `CODE: ${(item as Port).code} | ${(item as Port).country}`
-                                                                  : cat === 'country'
-                                                                    ? `ISO: ${(item as Country).cca2}`
-                                                                    : cat === 'city'
-                                                                      ? `COUNTRY: ${(item as City).country} (${(item as City).iso})`
-                                                                      : cat === 'continent'
+                                                            {isVessel(item)
+                                                                ? `MMSI: ${item.mmsi} | IMO: ${item.imo || 'Unknown'}`
+                                                                : isPort(item)
+                                                                  ? `CODE: ${item.code} | ${item.country}`
+                                                                  : isCountry(item)
+                                                                    ? `ISO: ${item.cca2}`
+                                                                    : isCity(item)
+                                                                      ? `COUNTRY: ${item.country} (${item.iso})`
+                                                                      : item.category ===
+                                                                          'continent'
                                                                         ? 'Region'
                                                                         : 'Water Body'}
                                                         </span>
