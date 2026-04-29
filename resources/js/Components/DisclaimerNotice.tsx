@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { FaInfoCircle, FaShieldAlt, FaFlask } from 'react-icons/fa';
+import { Head } from '@inertiajs/react';
 
 interface DisclaimerNoticeProps {
     onAccept?: () => void;
@@ -11,7 +12,6 @@ export default function DisclaimerNotice({ onAccept }: DisclaimerNoticeProps) {
     useEffect(() => {
         const hasAccepted = localStorage.getItem('sist_disclaimer_accepted');
         if (!hasAccepted) {
-            // Small delay for better UX
             const timer = setTimeout(() => setIsVisible(true), 500);
             return () => clearTimeout(timer);
         }
@@ -27,6 +27,7 @@ export default function DisclaimerNotice({ onAccept }: DisclaimerNoticeProps) {
 
     return (
         <div className="fixed inset-0 z-100 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm transition-all duration-500 animate-in fade-in">
+            <Head title="Disclosure" />
             <div className="bg-zinc-950 border border-white/10 w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-4 duration-500">
                 {/* Header */}
                 <div className="bg-zinc-900/50 border-b border-white/5 px-5 py-4 flex items-center gap-3">
