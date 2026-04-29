@@ -507,7 +507,10 @@ export default function HeaderBar({
     };
 
     return (
-        <header className="fixed top-0 left-0 right-0 z-50 p-2 sm:p-4 flex flex-col sm:flex-row items-center sm:items-start justify-between gap-2 sm:gap-0 pointer-events-none">
+        <header
+            role="banner"
+            className="fixed top-0 left-0 right-0 z-50 p-2 sm:p-4 flex flex-col sm:flex-row items-center sm:items-start justify-between gap-2 sm:gap-0 pointer-events-none"
+        >
             {showSuggestionsPanel && (
                 <div
                     className="fixed inset-0 pointer-events-auto z-0"
@@ -517,12 +520,20 @@ export default function HeaderBar({
 
             <div
                 onClick={handleLogoClick}
+                role="button"
+                aria-label={isRefreshing ? 'Refreshing Page' : 'SIST Home - Refresh'}
+                tabIndex={0}
+                onKeyDown={(e) => e.key === 'Enter' && handleLogoClick()}
                 className="relative flex items-center gap-2 sm:gap-3 bg-zinc-950 border border-white/20 px-3 py-2 sm:px-4 sm:py-3 shadow-2xl pointer-events-auto z-10 self-start cursor-pointer transition-all active:scale-95"
             >
                 {isRefreshing ? (
                     <div className="relative w-5 h-5 sm:w-7 sm:h-7 flex items-center justify-center">
                         <div className="w-full h-full border-[3px] border-white/10 rounded-full" />
-                        <div className="absolute inset-0 border-t-[3px] border-white rounded-full animate-spin" />
+                        <div
+                            className="absolute inset-0 border-t-[3px] border-white rounded-full animate-spin"
+                            aria-hidden="true"
+                        />
+                        <span className="sr-only">Refreshing...</span>
                     </div>
                 ) : (
                     <img src="/images/logo.png" alt="SIST" className="h-5 sm:h-7 w-auto" />
@@ -540,11 +551,28 @@ export default function HeaderBar({
             </div>
 
             <div className="relative w-full sm:px-0 sm:max-w-[400px] min-[960px]:absolute min-[960px]:left-1/2 min-[960px]:-translate-x-1/2 pointer-events-auto z-10">
-                <div className="relative flex items-center gap-3 bg-zinc-950 border border-white/20 px-4 py-3 shadow-2xl transition-all focus-within:border-white/40 focus-within:ring-1 focus-within:ring-white/10">
-                    <FaSearch className={`w-4 h-4 ${query ? 'text-white' : 'text-zinc-500'}`} />
+                <div
+                    role="combobox"
+                    aria-expanded={showSuggestionsPanel}
+                    aria-haspopup="listbox"
+                    aria-controls="search-results-listbox"
+                    aria-owns="search-results-listbox"
+                    className="relative flex items-center gap-3 bg-zinc-950 border border-white/20 px-4 py-3 shadow-2xl transition-all focus-within:border-white/40 focus-within:ring-1 focus-within:ring-white/10"
+                >
+                    <FaSearch
+                        className={`w-4 h-4 ${query ? 'text-white' : 'text-zinc-500'}`}
+                        aria-hidden="true"
+                    />
                     <input
                         type="text"
                         value={activeQuery}
+                        role="searchbox"
+                        aria-autocomplete="list"
+                        aria-controls="search-results-listbox"
+                        aria-activedescendant={
+                            selectedIndex >= 0 ? `suggestion-item-${selectedIndex}` : undefined
+                        }
+                        aria-label="Search vessels, ports, or coordinates"
                         onChange={(e) => {
                             if (selectedVesselName && onVesselSelect) {
                                 onVesselSelect(null);
@@ -580,6 +608,9 @@ export default function HeaderBar({
                 {showSuggestionsPanel && (
                     <div
                         ref={scrollContainerRef}
+                        id="search-results-listbox"
+                        role="listbox"
+                        aria-label="Search suggestions"
                         className="absolute top-full left-0 right-0 bg-zinc-950 border-x border-b border-white/20 shadow-2xl mt-px max-h-[60vh] overflow-y-auto"
                     >
                         {isSearchEmpty && hasRecents && (
@@ -590,6 +621,7 @@ export default function HeaderBar({
                                     </span>
                                     <button
                                         onClick={clearRecents}
+                                        aria-label="Clear recent searches"
                                         className="text-[8px] text-zinc-600 hover:text-red-400 font-bold uppercase tracking-widest transition-colors flex items-center gap-1.5"
                                     >
                                         <FaTrash className="w-2 h-2" />
@@ -613,6 +645,9 @@ export default function HeaderBar({
                                     return (
                                         <button
                                             key={`recent-${idx}`}
+                                            id={`suggestion-item-${globalIdx}`}
+                                            role="option"
+                                            aria-selected={isSelected}
                                             data-selected={isSelected}
                                             onClick={() => handleSelect(item)}
                                             className={`w-full flex items-center justify-between px-4 py-3 transition-colors border-b border-white/5 last:border-none text-left ${
@@ -725,6 +760,9 @@ export default function HeaderBar({
                                         return (
                                             <button
                                                 key={`${cat}-${idx}`}
+                                                id={`suggestion-item-${globalIdx}`}
+                                                role="option"
+                                                aria-selected={isSelected}
                                                 data-selected={isSelected}
                                                 onClick={() => handleSelect(item)}
                                                 className={`w-full flex items-center justify-between px-4 py-3 transition-colors border-b border-white/5 last:border-none text-left ${

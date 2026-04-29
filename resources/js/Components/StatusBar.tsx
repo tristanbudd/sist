@@ -77,9 +77,16 @@ export default function StatusBar({
 
     return (
         <>
-            <div className="fixed bottom-0 left-0 right-0 h-8 bg-zinc-950 border-t border-zinc-800/50 flex items-center justify-between px-4 text-zinc-400 text-[11px] font-medium z-3000">
+            <footer
+                role="contentinfo"
+                className="fixed bottom-0 left-0 right-0 h-8 bg-zinc-950 border-t border-zinc-800/50 flex items-center justify-between px-4 text-zinc-400 text-[11px] font-medium z-3000"
+            >
                 {/* Left section - Stats */}
-                <div className="flex items-center gap-3 overflow-x-auto">
+                <div
+                    className="flex items-center gap-3 overflow-x-auto"
+                    aria-live="polite"
+                    aria-atomic="false"
+                >
                     <StatItem
                         label="Rendered"
                         value={
@@ -95,7 +102,10 @@ export default function StatusBar({
                         {currentArea}
                     </span>
                     <Divider className="max-md:hidden" />
-                    <span className="text-zinc-500 text-[10px] font-mono whitespace-nowrap hidden md:inline">
+                    <span
+                        className="text-zinc-500 text-[10px] font-mono whitespace-nowrap hidden md:inline"
+                        aria-label={`Current time: ${currentTime.toLocaleTimeString()}`}
+                    >
                         {currentTime.toLocaleTimeString('en-GB', {
                             hour: '2-digit',
                             minute: '2-digit',
@@ -147,8 +157,11 @@ export default function StatusBar({
                         <button
                             className="flex items-center gap-2 px-2 py-1 rounded-md transition-colors hover:bg-zinc-900/50"
                             onClick={() => setShowDetails(!showDetails)}
+                            aria-haspopup="dialog"
+                            aria-expanded={showDetails}
+                            aria-label={`System Status: ${statusInfo.text}. Click to view details.`}
                         >
-                            <div className="relative flex items-center">
+                            <div className="relative flex items-center" aria-hidden="true">
                                 <div
                                     className={`w-1.5 h-1.5 rounded-full ${statusInfo.color} ring-2 ${statusInfo.ring}`}
                                 />
@@ -159,7 +172,11 @@ export default function StatusBar({
                         </button>
 
                         {showDetails && systemStatus && (
-                            <div className="absolute bottom-full right-0 mb-2 bg-zinc-950 border border-white/20 shadow-2xl p-4 w-80 sm:w-96 animate-in slide-in-from-bottom-2 duration-200">
+                            <div
+                                role="dialog"
+                                aria-label="System Health Details"
+                                className="absolute bottom-full right-0 mb-2 bg-zinc-950 border border-white/20 shadow-2xl p-4 w-80 sm:w-96 animate-in slide-in-from-bottom-2 duration-200"
+                            >
                                 <div className="space-y-3">
                                     <div className="flex items-center justify-between pb-3 border-b border-white/10">
                                         <div>
@@ -210,7 +227,7 @@ export default function StatusBar({
                         )}
                     </div>
                 </div>
-            </div>
+            </footer>
 
             {showDetails && systemStatus && (
                 <div
