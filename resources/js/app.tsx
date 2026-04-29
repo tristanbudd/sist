@@ -20,7 +20,7 @@ router.on('navigate', (event) => {
 const pages = import.meta.glob('./Pages/**/*.tsx', { eager: true });
 
 createInertiaApp({
-    title: (title) => `${appName} | ${title}`,
+    title: (title) => (title ? `${appName} | ${title}` : appName),
 
     resolve: (name) => {
         const page = pages[`./Pages/${name}.tsx`];

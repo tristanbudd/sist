@@ -476,12 +476,12 @@ function FleetLayer({
         return L.divIcon({
             className: 'vessel-icon-container',
             html: `
-                <div style="transform: rotate(${course}deg); display: flex; align-items: center; justify-content: center;">
+                <div style="transform: rotate(${course}deg); display: flex; align-items: center; justify-content: center; width: 48px; height: 48px;">
                     ${isCluster ? clusterIconHtml : singleIconHtml}
                 </div>
             `,
-            iconSize: [22, 22],
-            iconAnchor: [11, 11],
+            iconSize: [48, 48],
+            iconAnchor: [24, 24],
         });
     };
 
@@ -556,6 +556,7 @@ function FleetLayer({
                         interactive={true}
                         bubblingMouseEvents={false}
                         riseOnHover={true}
+                        title={`Vessel: ${vessel.name} (MMSI: ${vessel.mmsi})`}
                         icon={createVesselIcon(
                             vessel.course || 0,
                             vessel.isCluster,
@@ -629,6 +630,8 @@ function PortLayer() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
+                    width: '48px',
+                    height: '48px',
                     color: '#22d3ee',
                     filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.5))',
                 }}
@@ -636,8 +639,8 @@ function PortLayer() {
                 <FaAnchor style={{ width: '14px', height: '14px' }} />
             </div>
         ),
-        iconSize: [14, 14],
-        iconAnchor: [7, 7],
+        iconSize: [48, 48],
+        iconAnchor: [24, 24],
     });
 
     return (
@@ -646,6 +649,7 @@ function PortLayer() {
                 <Marker
                     key={`port-${port.code}-${idx}`}
                     position={[port.lat, port.lng]}
+                    title={`Port: ${port.name} (${port.code})`}
                     icon={portIcon}
                 >
                     <Popup closeButton={false} minWidth={200}>
@@ -745,6 +749,8 @@ function CityLayer() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
+                    width: '48px',
+                    height: '48px',
                     color: '#22c55e',
                     filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.5))',
                 }}
@@ -752,8 +758,8 @@ function CityLayer() {
                 <FaCity style={{ width: '12px', height: '12px' }} />
             </div>
         ),
-        iconSize: [12, 12],
-        iconAnchor: [6, 6],
+        iconSize: [48, 48],
+        iconAnchor: [24, 24],
     });
 
     return (
@@ -762,6 +768,7 @@ function CityLayer() {
                 <Marker
                     key={`city-${city.name}-${idx}`}
                     position={[city.lat, city.lng]}
+                    title={`City: ${city.name}, ${COUNTRY_NAMES[city.country] || city.country}`}
                     icon={cityIcon}
                 >
                     <Popup closeButton={false} minWidth={150}>

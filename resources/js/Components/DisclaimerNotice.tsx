@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { FaInfoCircle, FaShieldAlt, FaFlask } from 'react-icons/fa';
+import { Head } from '@inertiajs/react';
 
 interface DisclaimerNoticeProps {
     onAccept?: () => void;
@@ -11,7 +12,6 @@ export default function DisclaimerNotice({ onAccept }: DisclaimerNoticeProps) {
     useEffect(() => {
         const hasAccepted = localStorage.getItem('sist_disclaimer_accepted');
         if (!hasAccepted) {
-            // Small delay for better UX
             const timer = setTimeout(() => setIsVisible(true), 500);
             return () => clearTimeout(timer);
         }
@@ -26,13 +26,29 @@ export default function DisclaimerNotice({ onAccept }: DisclaimerNoticeProps) {
     if (!isVisible) return null;
 
     return (
-        <div className="fixed inset-0 z-100 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm transition-all duration-500 animate-in fade-in">
+        <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="disclaimer-title"
+            aria-describedby="disclaimer-description"
+            className="fixed inset-0 z-100 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm transition-all duration-500 animate-in fade-in"
+        >
+            <Head title="Disclosure" />
             <div className="bg-zinc-950 border border-white/10 w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-4 duration-500">
                 {/* Header */}
                 <div className="bg-zinc-900/50 border-b border-white/5 px-5 py-4 flex items-center gap-3">
-                    <img src="/images/logo.png" alt="SIST" className="h-6 w-auto" />
+                    <img
+                        src="/images/logo.png"
+                        alt=""
+                        width="128"
+                        height="32"
+                        className="h-6 w-auto"
+                    />
                     <div>
-                        <h2 className="text-white text-[13px] font-black tracking-tight uppercase">
+                        <h2
+                            id="disclaimer-title"
+                            className="text-white text-[13px] font-black tracking-tight uppercase"
+                        >
                             SIST System Disclosure
                         </h2>
                         <p className="text-zinc-500 text-[9px] uppercase tracking-widest font-bold">
@@ -42,9 +58,12 @@ export default function DisclaimerNotice({ onAccept }: DisclaimerNoticeProps) {
                 </div>
 
                 {/* Content */}
-                <div className="p-6 pb-2 space-y-6">
+                <div id="disclaimer-description" className="p-6 pb-2 space-y-6">
                     <section className="flex gap-4">
-                        <FaInfoCircle className="w-3.5 h-3.5 text-zinc-500 mt-1 shrink-0" />
+                        <FaInfoCircle
+                            className="w-3.5 h-3.5 text-zinc-500 mt-1 shrink-0"
+                            aria-hidden="true"
+                        />
                         <div>
                             <h3 className="text-zinc-200 text-[11px] font-black mb-1.5 uppercase tracking-wider">
                                 AIS Coverage Limits
@@ -58,7 +77,10 @@ export default function DisclaimerNotice({ onAccept }: DisclaimerNoticeProps) {
                     </section>
 
                     <section className="flex gap-4">
-                        <FaShieldAlt className="w-3.5 h-3.5 text-zinc-500 mt-1 shrink-0" />
+                        <FaShieldAlt
+                            className="w-3.5 h-3.5 text-zinc-500 mt-1 shrink-0"
+                            aria-hidden="true"
+                        />
                         <div>
                             <h3 className="text-zinc-200 text-[11px] font-black mb-1.5 uppercase tracking-wider">
                                 Data Integrity
@@ -72,7 +94,10 @@ export default function DisclaimerNotice({ onAccept }: DisclaimerNoticeProps) {
                     </section>
 
                     <section className="flex gap-4">
-                        <FaFlask className="w-3.5 h-3.5 text-zinc-500 mt-1 shrink-0" />
+                        <FaFlask
+                            className="w-3.5 h-3.5 text-zinc-500 mt-1 shrink-0"
+                            aria-hidden="true"
+                        />
                         <div>
                             <h3 className="text-zinc-200 text-[11px] font-black mb-1.5 uppercase tracking-wider">
                                 Developmental Status

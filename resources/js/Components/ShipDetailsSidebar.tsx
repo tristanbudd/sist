@@ -447,7 +447,9 @@ export default function ShipDetailsSidebar({
 
     return (
         <>
-            <div
+            <aside
+                role="complementary"
+                aria-labelledby="vessel-details-title"
                 className={`fixed top-0 right-0 h-[calc(100%-32px)] w-full sm:w-[400px] bg-zinc-950/95 backdrop-blur-xl border-l border-white/10 z-2000 shadow-2xl transition-transform duration-500 ease-in-out transform ${isOpen && !isMinimized ? 'translate-x-0' : 'translate-x-full'} flex flex-col`}
             >
                 <div className="p-6 border-b border-white/10 shrink-0">
@@ -455,20 +457,25 @@ export default function ShipDetailsSidebar({
                         <button
                             onClick={() => setIsMinimized(true)}
                             className="sm:hidden p-2 hover:bg-white/5 transition-colors text-zinc-500 hover:text-white"
+                            aria-label="Minimize Details"
                             title="Minimize Details"
                         >
-                            <FaChevronDown className="w-5 h-5" />
+                            <FaChevronDown className="w-5 h-5" aria-hidden="true" />
                         </button>
                         <button
                             onClick={onClose}
                             className="p-2 hover:bg-white/5 transition-colors text-zinc-500 hover:text-white"
+                            aria-label="Close Details"
                             title="Close Details"
                         >
-                            <FaXmark className="w-5 h-5" />
+                            <FaXmark className="w-5 h-5" aria-hidden="true" />
                         </button>
                     </div>
 
-                    <h2 className="text-2xl font-black text-white tracking-tight uppercase leading-tight">
+                    <h2
+                        id="vessel-details-title"
+                        className="text-2xl font-black text-white tracking-tight uppercase leading-tight"
+                    >
                         {details?.name || vessel.name || 'Unknown Vessel'}
                     </h2>
                     <div className="flex items-center gap-4 mt-2">
@@ -509,8 +516,16 @@ export default function ShipDetailsSidebar({
                 </div>
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8">
-                    <section className={loading.details ? 'animate-pulse opacity-50' : ''}>
-                        <SectionTitle icon={<FaLocationDot />} title="Live Status" />
+                    <section
+                        aria-labelledby="live-status-section"
+                        aria-busy={loading.details}
+                        className={loading.details ? 'animate-pulse opacity-50' : ''}
+                    >
+                        <SectionTitle
+                            id="live-status-section"
+                            icon={<FaLocationDot aria-hidden="true" />}
+                            title="Live Status"
+                        />
                         <div className="grid grid-cols-2 gap-4 mt-4">
                             <StatusCard
                                 label="Nav Status"
@@ -615,8 +630,16 @@ export default function ShipDetailsSidebar({
                             </div>
                         </div>
                     </section>
-                    <section className={loading.sanctions ? 'animate-pulse opacity-50' : ''}>
-                        <SectionTitle icon={<FaShieldHalved />} title="Compliance & Security" />
+                    <section
+                        aria-labelledby="compliance-section"
+                        aria-busy={loading.sanctions}
+                        className={loading.sanctions ? 'animate-pulse opacity-50' : ''}
+                    >
+                        <SectionTitle
+                            id="compliance-section"
+                            icon={<FaShieldHalved aria-hidden="true" />}
+                            title="Compliance & Security"
+                        />
                         {(() => {
                             const officialSanctions =
                                 sanctions?.sanctions.filter(
@@ -1361,7 +1384,7 @@ export default function ShipDetailsSidebar({
                         <FaArrowRight className="group-hover:translate-x-1 transition-transform" />
                     </button>
                 </div>
-            </div>
+            </aside>
             {isMinimized && (
                 <button
                     onClick={() => setIsMinimized(false)}
@@ -1377,11 +1400,11 @@ export default function ShipDetailsSidebar({
         </>
     );
 }
-function SectionTitle({ icon, title }: { icon: ReactNode; title: string }) {
+function SectionTitle({ icon, title, id }: { icon: ReactNode; title: string; id?: string }) {
     return (
         <div className="flex items-center gap-2.5">
             <div className="text-zinc-400 text-sm">{icon}</div>
-            <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-zinc-500">
+            <h3 id={id} className="text-[11px] font-black uppercase tracking-[0.2em] text-zinc-500">
                 {title}
             </h3>
             <div className="flex-1 h-px bg-white/5" />
