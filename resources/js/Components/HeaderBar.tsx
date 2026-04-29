@@ -193,6 +193,7 @@ export default function HeaderBar({
     selectedVesselName,
     showClusterZoomNotice = false,
 }: HeaderBarProps) {
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const [query, setQuery] = useState('');
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [categoryLimits, setCategoryLimits] = useState<Record<string, number>>({
@@ -205,6 +206,14 @@ export default function HeaderBar({
     });
     const [error, setError] = useState<string | null>(null);
     const activeQuery = selectedVesselName ?? query;
+
+    const handleLogoClick = () => {
+        if (isRefreshing) return;
+        setIsRefreshing(true);
+        setTimeout(() => {
+            window.location.reload();
+        }, 800);
+    };
 
     const allResults = useMemo(() => {
         const liveVessels: Vessel[] = trackedVessels.map((v) => ({
@@ -367,14 +376,26 @@ export default function HeaderBar({
                 />
             )}
 
-            <div className="relative flex items-center gap-2 sm:gap-3 bg-zinc-950 border border-white/20 px-3 py-2 sm:px-4 sm:py-3 shadow-2xl pointer-events-auto z-10 self-start">
-                <img src="/images/logo.png" alt="SIST" className="h-5 sm:h-7 w-auto" />
+            <div
+                onClick={handleLogoClick}
+                className="relative flex items-center gap-2 sm:gap-3 bg-zinc-950 border border-white/20 px-3 py-2 sm:px-4 sm:py-3 shadow-2xl pointer-events-auto z-10 self-start cursor-pointer transition-all active:scale-95"
+            >
+                {isRefreshing ? (
+                    <div className="relative w-5 h-5 sm:w-7 sm:h-7 flex items-center justify-center">
+                        <div className="w-full h-full border-[3px] border-white/10 rounded-full" />
+                        <div className="absolute inset-0 border-t-[3px] border-white rounded-full animate-spin" />
+                    </div>
+                ) : (
+                    <img src="/images/logo.png" alt="SIST" className="h-5 sm:h-7 w-auto" />
+                )}
                 <div className="flex flex-col justify-center leading-none">
                     <span className="text-white text-xs sm:text-sm font-bold tracking-wider">
-                        SIST
+                        {isRefreshing ? 'REFRESHING...' : 'SIST'}
                     </span>
                     <span className="text-zinc-500 text-[8px] sm:text-[9px] font-medium mt-0.5 hidden xs:block">
-                        Intelligence & Suspicion Tracker
+                        {isRefreshing
+                            ? 'REFRESHING THE PAGE...'
+                            : 'Intelligence & Suspicion Tracker'}
                     </span>
                 </div>
             </div>
