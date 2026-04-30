@@ -67,6 +67,8 @@ export interface Vessel {
 interface ClusteredVessel extends Vessel {
     isCluster: boolean;
     clusterCount: number;
+    sumLat: number;
+    sumLng: number;
 }
 
 const IGNORED_VESSEL_NAMES = ['--'];
@@ -256,6 +258,7 @@ function FleetLayer({
         },
         zoomend: () => {
             recordActivity();
+            setZoom(map.getZoom());
             debouncedFetch();
         },
         popupclose: () => {
@@ -322,18 +325,28 @@ function FleetLayer({
     const visibleVessels = useMemo(() => {
         const filtered: ClusteredVessel[] = [];
 
-        // Dynamically adjust the pixel radius for clustering based on zoom level
-        // At zoom level 10 and above, clustering is completely disabled to ensure distinct ship selection
-        const minDistancePx = zoom < 6 ? 30 : zoom < 10 ? 15 : 0;
+        const minDistancePx = zoom < 4 ? 25 : zoom < 9 ? 30 : zoom < 12 ? 25 : zoom < 15 ? 15 : 0;
 
         if (minDistancePx === 0) {
-            return windowVessels.map((v) => ({ ...v, isCluster: false, clusterCount: 1 }));
+            return windowVessels.map((v) => ({
+                ...v,
+                isCluster: false,
+                clusterCount: 1,
+                sumLat: v.lat,
+                sumLng: v.lng,
+            }));
         }
 
         windowVessels.forEach((vessel) => {
             // Selected vessels bypass clustering to remain interactive
             if (vessel.mmsi === selectedMmsi) {
-                filtered.push({ ...vessel, isCluster: false, clusterCount: 1 });
+                filtered.push({
+                    ...vessel,
+                    isCluster: false,
+                    clusterCount: 1,
+                    sumLat: vessel.lat,
+                    sumLng: vessel.lng,
+                });
                 return;
             }
 
@@ -348,16 +361,28 @@ function FleetLayer({
             if (clusterIndex !== -1) {
                 filtered[clusterIndex].isCluster = true;
                 filtered[clusterIndex].clusterCount++;
+                filtered[clusterIndex].sumLat += vessel.lat;
+                filtered[clusterIndex].sumLng += vessel.lng;
             } else {
-                filtered.push({ ...vessel, isCluster: false, clusterCount: 1 });
+                filtered.push({
+                    ...vessel,
+                    isCluster: false,
+                    clusterCount: 1,
+                    sumLat: vessel.lat,
+                    sumLng: vessel.lng,
+                });
             }
         });
 
-        // Ensure isCluster is only true if there are actually multiple vessels
-        return filtered.map((v) => ({
-            ...v,
-            isCluster: v.isCluster && v.clusterCount > 1,
-        }));
+        return filtered.map((v) => {
+            const isActualCluster = v.isCluster && v.clusterCount > 1;
+            return {
+                ...v,
+                isCluster: isActualCluster,
+                lat: isActualCluster ? v.sumLat / v.clusterCount : v.lat,
+                lng: isActualCluster ? v.sumLng / v.clusterCount : v.lng,
+            };
+        });
     }, [windowVessels, map, zoom, selectedMmsi]);
 
     const getAreaName = useCallback((lat: number, lng: number, currentZoom: number) => {
@@ -517,7 +542,7 @@ function FleetLayer({
             suppressNextMapClickRef.current = true;
             if (onVesselSelect) onVesselSelect(null);
             if (onClusterZoomNotice) onClusterZoomNotice();
-            const nextZoom = Math.min(Math.max(map.getZoom() + 2, 11), 14);
+            const nextZoom = Math.min(Math.max(map.getZoom() + 2, 11), 16);
             map.flyTo([vessel.lat, vessel.lng], nextZoom, {
                 duration: 0.7,
                 easeLinearity: 0.25,
