@@ -38,8 +38,8 @@ class SecurityHeaders
                    "script-src 'self' 'nonce-{$nonce}' 'strict-dynamic' 'unsafe-eval' https:; ".
                    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; ".
                    "img-src 'self' data: https:; ".
-                   "font-src 'self' https://fonts.gstatic.com; ".
-                   "connect-src 'self' https://sist.tristanbudd.com wss://* https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com; ".
+                   "font-src 'self' https://fonts.gstatic.com https://fonts.googleapis.com; ".
+                   "connect-src 'self' https://sist.tristanbudd.com https://proxy.scalar.com https://cdn.jsdelivr.net wss://* https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com; ".
                    "frame-ancestors 'none'; ".
                    'upgrade-insecure-requests';
 

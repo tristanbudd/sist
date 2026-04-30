@@ -16,7 +16,7 @@ use App\Http\Controllers\Api\ConditionsController;
 use App\Http\Controllers\Api\StatusController;
 use App\Http\Controllers\Api\VesselController;
 
-Route::prefix('api')->group(function () {
+Route::prefix('api')->middleware('throttle:api')->group(function () {
     Route::prefix('v1')->group(function () {
         Route::prefix('status')->name('status.')->group(function () {
             Route::get('/', [StatusController::class, 'index'])->name('index');
