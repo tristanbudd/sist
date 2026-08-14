@@ -37,6 +37,8 @@ return [
 
     'aisstream' => [
         'key' => env('AISSTREAM_API_KEY'),
+        'initial_retry_delay' => (int) env('AISSTREAM_RETRY_DELAY', 10),
+        'max_retry_delay' => (int) env('AISSTREAM_MAX_RETRY_DELAY', 300),
     ],
 
     'sanctions_network' => [

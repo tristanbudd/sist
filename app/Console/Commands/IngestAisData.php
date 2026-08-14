@@ -37,42 +37,63 @@ class IngestAisData extends Command
         if (empty($apiKey)) {
             $this->error('SIST | ERROR: AISStream API Key is missing. Check your .env file and run `php artisan config:clear`.');
 
-            return;
+            return 1;
         }
 
-        $this->info('SIST | Initializing AISStream Connection...');
+        $initialRetryDelay = (int) config('services.aisstream.initial_retry_delay', 10);
+        $maxRetryDelay = (int) config('services.aisstream.max_retry_delay', 300);
 
-        try {
-            $client = new Client($url, ['timeout' => 60]);
+        $retryDelay = $initialRetryDelay;
+        $attempt = 0;
 
-            $subscribeMsg = [
-                'APIKey' => $apiKey,
-                'BoundingBoxes' => [[[-90, -180], [90, 180]]],
-                'FilterMessageTypes' => ['PositionReport', 'ShipStaticData'],
-            ];
+        while (true) {
+            $attempt++;
+            $this->info("SIST | Initializing AISStream Connection (Attempt {$attempt})...");
 
-            $client->send(json_encode($subscribeMsg));
-            $this->info('SIST | Subscription Active. Listening for vessels...');
+            try {
+                $client = new Client($url, ['timeout' => 60]);
 
-            while (true) {
-                try {
-                    $raw = $client->receive();
-                    $data = json_decode($raw, true);
+                $subscribeMsg = [
+                    'APIKey' => $apiKey,
+                    'BoundingBoxes' => [[[-90, -180], [90, 180]]],
+                    'FilterMessageTypes' => ['PositionReport', 'ShipStaticData'],
+                ];
 
-                    if (isset($data['MessageType'])) {
-                        $this->processMessage($data);
+                $client->send(json_encode($subscribeMsg));
+                $this->info('SIST | Subscription Active. Listening for vessels...');
+
+                $connectedSuccessfully = false;
+
+                while (true) {
+                    try {
+                        $raw = $client->receive();
+                        $data = json_decode($raw, true);
+
+                        if (isset($data['MessageType'])) {
+                            if (! $connectedSuccessfully) {
+                                $connectedSuccessfully = true;
+                                $retryDelay = $initialRetryDelay;
+                                $attempt = 0;
+                            }
+                            $this->processMessage($data);
+                        }
+                    } catch (ConnectionException $e) {
+                        $this->warn('SIST | Connection lost: '.$e->getMessage());
+                        break;
+                    } catch (Exception $e) {
+                        $this->error('SIST | Error processing message: '.$e->getMessage());
+
+                        continue;
                     }
-                } catch (ConnectionException $e) {
-                    $this->warn('SIST | Connection lost. Reconnecting...');
-                    break;
-                } catch (Exception $e) {
-                    $this->error('SIST | Error processing message: '.$e->getMessage());
-
-                    continue;
                 }
+            } catch (Exception $e) {
+                $this->error('SIST | Connection failed: '.$e->getMessage());
             }
-        } catch (Exception $e) {
-            $this->error('SIST | Fatal Error: '.$e->getMessage());
+
+            $this->warn("SIST | Reconnecting in {$retryDelay}s (Max retry cap: {$maxRetryDelay}s)...");
+            sleep($retryDelay);
+
+            $retryDelay = (int) min($maxRetryDelay, $retryDelay * 2);
         }
     }
 
